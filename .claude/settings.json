@@ -1,12 +1,14 @@
 {
   "permissions": {
     "allow": [
-      "Read(**)",
-      "WebFetch(*)",
 
+      "Read(**)",
+      "Grep(**)",
+      "WebFetch(*)",
+      "Bash(*)",
       "Write(**)",
       "Edit(**)",
-      
+
       "Bash(find *)",
       "Bash(ls *)",
       "Bash(wc *)",
@@ -15,8 +17,7 @@
       "Bash(cd *)",
       "Bash(pwd *)",
       "Bash(diff *)",
-      "Bash(curl *)",
-      "Bash(*)"
+      "Bash(curl -sl*)"
     ]
   },
   "enabledPlugins": {
