@@ -1,0 +1,220 @@
+# RimWorld (rimWrld) — In-Depth Source Analysis
+
+## Scale Overview
+
+| Metric | Value |
+|--------|-------|
+| **Total C# files** | **9,806** |
+| **Total files (all assets)** | 28,084 |
+| **Total size** | 429.84 MB |
+| **Main DLL** | Assembly-CSharp.dll = 15.17 MB |
+| **PNG textures** | ~3,500 |
+| **Compiled DLLs** | 108 |
+
+---
+
+## Architecture: Two-Layer Monolith
+
+```
+┌──────────────────────────────────────────────────────────┐
+│  RimWorld Namespace (6,770 files)                        │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Gameplay Systems: Comps, Jobs, Thoughts, Incidents │  │
+│  │ 820 Comps · 255 JobDrivers · 238 ThoughtWorkers   │  │
+│  │ 143 WorkGivers · 132 Alerts · 105 GenSteps        │  │
+│  │ 95 IncidentWorkers · 87 Buildings · 86 Dialogs    │  │
+│  │ 80 Designators · 39 ITabs · 20 Needs              │  │
+│  ├────────────────────────────────────────────────────┤  │
+│  │ Sub-systems:                                       │  │
+│  │   QuestGen/ (381) · Planet/ (302)                  │  │
+│  │   BaseGen/ (125) · SketchGen/ (37)                 │  │
+│  └────────────────────────────────────────────────────┘  │
+│                    │ uses (5,348/5,913 = 90%)             │
+│                    ▼                                      │
+│  ┌────────────────────────────────────────────────────┐  │
+│  │ Verse Namespace (2,306 files) — "Engine Layer"     │  │
+│  │ ┌──────────────────────────────────────────────┐   │  │
+│  │ │ Core Types: Def, Thing, ThingWithComps, Map, │   │  │
+│  │ │ Pawn, Game, Building, Hediff, CompProperties │   │  │
+│  │ ├──────────────────────────────────────────────┤   │  │
+│  │ │ AI/ (407 files): Jobs, ThinkTrees, Mental    │   │  │
+│  │ │ Sound/ (69) · Noise/ (51) · Steam/ (14)     │   │  │
+│  │ │ Grammar/ (9) · Glow/ (7)                    │   │  │
+│  │ │ Root files: 1,747 (flat dump)                │   │  │
+│  │ └──────────────────────────────────────────────┘   │  │
+│  │           │ references back ↑ (659/1,747 = 38%)    │  │
+│  └────────────────────────────────────────────────────┘  │
+│                                                          │
+│  LudeonTK (50) — Debug toolkit                           │
+│  External: NAudio(441) ISharpZipLib(39) NVorbis(28)      │
+│  firstpass(45) System(41) Ionic(29) DelaunatorSharp(7)   │
+│  KTrie(6) Gilzoide(5) RuntimeAudioClipLoader(3)          │
+└──────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Core Type Hierarchy (The Verse Stack)
+
+```
+Editable
+ └── Def                        ← XML-loadable config base (250 subclasses)
+      ├── BuildableDef
+      │    └── ThingDef          ← defines what a Thing IS (comps, graphics, recipes)
+      ├── HediffDef              ← health condition definitions
+      ├── JobDef, WorkTypeDef    ← AI task definitions  
+      ├── RecipeDef              ← crafting definitions
+      └── 161+ more in RimWorld (FactionDef, BiomeDef, StatDef...)
+
+Entity
+ └── Thing                      ← physical world object base
+      └── ThingWithComps         ← composable entity (820+ Comp types)
+           ├── Building          ← stationary structures (87 subclasses)
+           │    ├── Building_Door, Building_Turret, Building_Bed...
+           │    └── Building_WorkTable, Building_Storage...
+           ├── Pawn              ← intelligent character (THE god class)
+           │    └── 40+ Pawn_*Tracker fields
+           ├── Apparel, Filth, Fire, Mote, Plant...
+           └── MinifiedThing, Corpse, Blueprint...
+```
+
+---
+
+## The Pawn Monolith (40+ Trackers)
+
+The `Pawn` class is the most complex single type:
+
+| Category | Trackers | Count |
+|----------|----------|-------|
+| **Verse Core** | ageTracker, health, inventory, jobs, stances, needs, verbTracker, carryTracker, pather, thinker, mindState, rotationTracker | 12 |
+| **RimWorld Base** | records, filth, equipment, apparel, skills, story, guest, guilt, relations, interactions, workSettings, drafter | 12 |
+| **DLC: Royalty** | royalty, abilities, psychicEntropy | 3 |
+| **DLC: Ideology** | ideo, style, styleObserver, precept | 4 |
+| **DLC: Biotech** | genes, mechanitor, learning, reading | 4 |
+| **DLC: Anomaly** | mutant, creepjoiner, connections | 3 |
+| **Misc** | caller, training, outfits, drugs, foodRestriction, timetable | 6 |
+
+---
+
+## Coupling Analysis
+
+| Direction | Files Coupling | Percentage | Severity |
+|-----------|---------------|------------|----------|
+| **RimWorld → Verse** | 5,348 / 5,913 | **90%** | Expected (downward) |
+| **Verse → RimWorld** | 659 / 1,747 | **38%** | **Circular** — engine depends on game |
+| **Verse/AI → RimWorld** | 163 / 407 | **40%** | **Circular** — AI tightly coupled |
+| **LudeonTK → Verse** | 37 / 50 | 74% | Expected (debug reads engine) |
+| **LudeonTK → RimWorld** | 17 / 50 | 34% | Cross-cutting debug |
+
+**Critical finding: 659 Verse files import RimWorld.** The "engine" layer is not actually independent — it has circular dependencies back to the gameplay layer. This is the single biggest architectural problem for any rebuild.
+
+---
+
+## The `Find` Static Locator (Root of All Coupling)
+
+`Find.cs` exposes **53 static properties** — every system in the game accesses every other system through this:
+
+```csharp
+Find.Maps          // all active maps
+Find.CurrentMap    // active map
+Find.World         // planet
+Find.Storyteller   // incident generator
+Find.TickManager   // time
+Find.FactionManager // factions
+Find.WindowStack   // UI
+Find.Selector      // selection
+Find.Camera        // camera
+// ... 44 more
+```
+
+Every class in the codebase does `Find.Something` instead of receiving dependencies through constructors. This makes independent testing, mocking, or extracting any system **impossible without rebuilding Find first**.
+
+---
+
+## Map: The God Object (74+ Subsystems)
+
+| Category | Subsystem Count | Examples |
+|----------|----------------|---------|
+| **Grids** | ~20 | ThingGrid, FogGrid, RegionGrid, TerrainGrid, PowerNetGrid, GasGrid, RoofGrid, GlowGrid |
+| **Managers** | ~12 | LordManager, DesignationManager, WeatherManager, ZoneManager, ReservationManager |
+| **Listers** | ~10 | ListerThings, ListerBuildings, ListerHaulables, ListerFilthInHomeArea |
+| **Watchers** | ~8 | DangerWatcher, FireWatcher, WealthWatcher, StrengthWatcher |
+| **Pathfinding** | ~4 | PathFinder, PawnPathPool, RegionAndRoomUpdater, RegionLinkDatabase |
+| **Other** | ~20+ | FleckManager, SkyManager, WindManager, AnimalPenManager, AutoSlaughterManager |
+
+---
+
+## DLC Content Embedded in Core
+
+DLC is **not separated** — it's mixed into the same RimWorld namespace:
+
+| DLC | Keyword Matches | Status |
+|-----|----------------|--------|
+| **Ideology** | Ideo(73), Ritual(293), Precept(132) | ~500 files mixed in |
+| **Biotech** | Gene(123), Mech(107) | ~230 files mixed in |
+| **Royalty** | Royal(35) | ~35 files mixed in |
+| **Anomaly** | Anomaly(11), Mutant(~30), Creep/Void/Dark | ~100+ files |
+
+---
+
+## Circular Dependency Chains
+
+```
+Chain 1 — AI Loop:
+  Pawn.jobs → JobDriver.DriverTick() → modifies Pawn state → issues new Job → Pawn.jobs
+
+Chain 2 — Health Cascade:  
+  Pawn.health → AddHediff() → Drawer update → Pawn.skills → Pawn.jobs → Pawn.health
+
+Chain 3 — Map Pathfinding:
+  Map.pathFinder → RegionAndRoomUpdater → RegionGrid → PawnPathPool → LordManager → pathFinder
+
+Chain 4 — Storyteller Loop:
+  Storyteller → Find.Maps → Map.mapPawns → Pawn.needs → Storyteller.difficulty
+```
+
+---
+
+## Rebuild Feasibility Assessment
+
+### What V-Slice (current framework) CAN'T handle:
+- ❌ 25-file/phase cap → would need 390+ phases at that size
+- ❌ GameEvents decoupling → Find.cs makes everything coupled; you can't event-decouple 659 circular refs
+- ❌ Flat peer systems → Verse is a deep layered stack, not peers
+- ❌ Phase independence → Pawn needs Map needs Game needs Storyteller needs Pawn
+
+### What verse-stack approach WOULD need:
+
+| Layer | Files | Dependencies | Phase Count |
+|-------|-------|-------------|-------------|
+| **L0: Primitives** | ~200 | None | 2-3 |
+| **L1: Def System** | ~350 | L0 | 3-5 |
+| **L2: Thing/Entity** | ~300 | L0-L1 | 3-5 |
+| **L3: Comp System** | ~200 | L0-L2 | 2-3 |
+| **L4: Map Infrastructure** | ~400 | L0-L3 | 5-8 |
+| **L5: Pawn Core** | ~300 | L0-L4 | 4-6 |
+| **L6: AI/Job System** | ~550 | L0-L5 | 6-10 |
+| **L7: Gameplay Systems** | ~2,000 | L0-L6 | 20-40 |
+| **L8: UI/Rendering** | ~800 | All | 8-15 |
+| **L9: World/Planet** | ~500 | L0-L7 | 5-8 |
+| **L10: QuestGen** | ~400 | All | 4-6 |
+| **L11: DLC Features** | ~800+ | All | 8-15 |
+| **External Libs** | ~600 | External | Skip/wrap |
+| **Estimated Total** | ~6,800 rebuildable | | **~70-120 phases** |
+
+### Key Decisions Required:
+1. **Find.cs replacement strategy** — dependency injection? Service locator with interfaces? This decision affects every single file.
+2. **Circular dependency breaking** — Verse→RimWorld (659 files) needs interfaces/events to break the cycle
+3. **Pawn decomposition** — keep 40-tracker monolith or redesign into optional components?
+4. **Map decomposition** — keep 74-subsystem god object or split into smaller containers?
+5. **DLC handling** — rebuild as core-integrated (faithful) or separate as optional modules (cleaner)?
+6. **Phase size** — mega-phases of 100-500 files, or more granular 50-100 file phases?
+
+### Bottom Line
+
+RimWorld is the **hardest project in the workspace** by a massive margin. It's 10-20x larger than the next biggest project and architecturally the most tightly coupled. A rebuild is theoretically possible but would require:
+- A new set of prompts (verse-stack)
+- Acceptance of tighter coupling within phases
+- Foundation layers that produce infrastructure, not playable features
+- ~70-120 phases minimum
+- Estimated **months** of implementation work per major layer

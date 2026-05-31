@@ -1,0 +1,18 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(claude /help)",
+      "WebFetch(domain:docs.windsurf.com)",
+      "WebFetch(domain:docs.codeium.com)",
+      "Bash(mkdir -p \"u:/IMPL/IMPL/LEARN/fillUpHole/phase-A/2-Data/Enums\")",
+      "Bash(mkdir -p \"u:/IMPL/IMPL/LEARN/fillUpHole/phase-A/0-Core\")",
+      "Bash(mkdir -p \"u:/IMPL/IMPL/LEARN/fillUpHole/phase-A/_-Systems/CoreSystem\")",
+      "Bash(mkdir -p \"u:/IMPL/IMPL/LEARN/fillUpHole/phase-A/_-Systems/EconomySystem/Interface\")",
+      "Bash(mkdir -p \"u:/IMPL/IMPL/LEARN/fillUpHole/phase-A/_-Systems/UpgradeSystem\")",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:dev.to)",
+      "WebFetch(domain:www.reddit.com)",
+      "WebFetch(domain:medium.com)"
+    ]
+  }
+}
