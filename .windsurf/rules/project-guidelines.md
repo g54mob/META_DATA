@@ -58,8 +58,8 @@ ROOT/
 ## Architecture Templates
 
 - **`.windsurf/rules/architecture-patterns.md`** — class responsibilities, decoupling, system shapes
-- **`.claude/templates/GOAL-general.md`** — full universal architecture rules with gold-standard examples
-- **`.claude/templates/NewAgent-general.md`** — universal agent instruction template
+- **`.windsurf/templates/GOAL-general.md`** — full universal architecture rules with gold-standard examples
+- **`.windsurf/templates/NewAgent-general.md`** — universal agent instruction template
 
 ## Skills (Domain Knowledge)
 

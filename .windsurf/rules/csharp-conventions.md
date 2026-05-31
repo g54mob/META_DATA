@@ -6,7 +6,7 @@ globs: "**/*.cs"
 
 # C# Conventions (Unity Architecture)
 
-> Single source of truth for all C# coding rules. Full detail with gold-standard examples in `.claude/templates/GOAL-general.md`.
+> Single source of truth for all C# coding rules. Full detail with gold-standard examples in `.windsurf/templates/GOAL-general.md`.
 
 > **ALL naming and capitalization rules are STRICTLY ENFORCED — no exceptions.**
 
