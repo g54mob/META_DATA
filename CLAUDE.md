@@ -85,6 +85,7 @@ ROOT/
 │   ├── MANUAL.md                     ← user reference for slash commands
 │   └── ROADMAP.md                    ← framework maturity & future plans
 ├── .github/                          ← GitHub Copilot config (parallel — same content, different format)
+├── .windsurf/                        ← Windsurf/Cascade config (parallel — same content, different format)
 ├── MAIN-SOURCE/
 │   ├── {project}/                    ← raw source (READ-ONLY — never modify)
 │   └── entire-{project}.stub        ← full file hierarchy including excluded assets

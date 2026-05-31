@@ -5,6 +5,7 @@
       "Read(**)",
       "Grep(**)",
       "WebFetch(*)",
+      "WebSearch(*)",
       "Bash(*)",
       "Write(**)",
       "Edit(**)",

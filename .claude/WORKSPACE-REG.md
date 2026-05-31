@@ -95,6 +95,34 @@
 
 ---
 
+## Genre Clusters
+
+| Genre | Count | Projects |
+|-------|-------|----------|
+| Horror | 5 | contentWarn, hGran, lethalCmpny, welcmHome, wrngFlr |
+| Tycoon / Management | 4 | bBrTycn, cardMarket, schedule, supMarket |
+| Idle / Incremental | 3 | idleNgu, idleWidget, idlerRusty |
+| Factory / Automation | 3 | autonauts, shapeHeroFactr, twFactory |
+| Physics Sandbox / Sim | 3 | bsge, hFallFlat, peoplePlayGrnd |
+| Colony Sim / Strategy | 2 | modulus, rimWrld |
+| Card / Strategy | 2 | aEqb, stackLand |
+| Co-op (as primary mode) | 2 | contentWarn, lethalCmpny |
+| City / Building Sim | 2 | basementToSky, townScape |
+| Action / Combat | 2 | frkt, megBonk |
+| Fighting / Multiplayer | 1 | stickFgt |
+| Tower Defense | 1 | throneFall |
+| Physics Battle Sim | 1 | TABS |
+| Engineering Puzzle | 1 | polyBridge3 |
+| Mystery / Puzzle | 2 | obradin, papersPls |
+| Narrative / Adventure | 3 | FWR, loop-2025, noImNot |
+| Casual / Puzzle | 2 | badP, fillUpHole |
+| Simulation (niche) | 2 | dCentre, itSim |
+| Mining / Sim | 1 | minemgl |
+
+> **Note:** Some projects appear in multiple clusters (e.g., `contentWarn` is both Horror and Co-op). Clusters reflect primary genre identity for at-a-glance lookup.
+
+---
+
 ## Notes
 
 - `.cs counts` are exact file counts from MAIN-SOURCE/ scan on 2026-05-30

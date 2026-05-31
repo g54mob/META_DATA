@@ -84,6 +84,7 @@ ROOT/
 │       ├── move-system.prompt.md             ← /move-system — relocate system between phases
 │       ├── merge-phase.prompt.md             ← /merge-phase — combine underpopulated phases
 │       └── refresh-workspace-reg.prompt.md   ← /refresh-workspace-reg — rescan & rebuild registry
+├── .windsurf/                        ← Windsurf/Cascade config (parallel — same content, different format)
 ├── MAIN-SOURCE/
 │   ├── {project}/                    ← raw source (READ-ONLY — never modify)
 │   └── entire-{project}.stub        ← full file hierarchy including excluded assets
@@ -107,11 +108,14 @@ ROOT/
 
 ## Key Rules
 
+- **Before writing ANY `.cs` file**, read `.github/instructions/csharp-conventions.instructions.md` if not already loaded this session.
 - `MAIN-SOURCE/` is **read-only** — all generated output goes under `LEARN/`.
 - `WORKSPACE-REG.md` is a **shallow index** — use it only for quick lookups (scale, genre, skill tags, status). For any real analysis (`/init`, `/build-phase`, `/audit-phase`, `/source-fidelity-check`, `/decouple-check`, etc.) always do in-depth reading of `MAIN-SOURCE/{project}/` directly.
 - `{PROJECT}` and `{PHASE}` are placeholders — **ask the user** for values before proceeding.
 - Each phase depends only on earlier phases, **never forward**.
 - `/build-phase` auto-chains `/audit-phase`, `/decouple-check`, and `/cross-phase-mod` as its final steps.
+- Phase size cap: max ~25 files per phase.
+- 80% rule: at least 80% of scripts per phase inside `_-Systems/`.
 
 ## Architecture Templates
 

@@ -344,7 +344,99 @@ X systems, Y scripts, Z .cs tests, W manual tests. Zero tight coupling.
 
 ---
 
-### 11. `## Art & Scene Work (Non-Script)` (if applicable)
+### 11. `## Assets Required` (MANDATORY)
+
+> **Every phase MUST have this section.** It is the exhaustive mapping of assets to scripts.
+> The source of truth is `MAIN-SOURCE/entire-{project}.stub`.
+
+```markdown
+## Assets Required
+
+> Source of truth: `MAIN-SOURCE/entire-{project}.stub`
+> Every asset listed below is referenced by a script in this phase — nothing is left out.
+
+### How This Section Was Built
+
+1. Read every `[SerializeField]` in every phase script — any Sprite, GameObject, AudioClip, Material, Font ref = asset dependency
+2. Read every `Resources.Load<T>()` call — code-loaded assets
+3. Read every string constant referencing layers, sorting layers, tags, or animator params — these require Unity project setup
+4. Cross-referenced each finding against `entire-{project}.stub` to provide exact paths
+
+### Sorting Layers (Project Settings → Tags and Layers)
+
+| # | Layer Name | Used By | Notes |
+|---|-----------|---------|-------|
+| 0 | [LayerName] | [ScriptName.cs]::[MethodName] | [Purpose] |
+
+### Textures & Sprites
+
+| Stub Path | Sprite Slices | Used By | Wiring |
+|-----------|---------------|---------|--------|
+| Assets/Texture2D/[name].png | [slice names if Multiple] | [SystemName]/[Script.cs] `_fieldName` | [SerializeField] / Inspector |
+
+### Audio (Resources.Load)
+
+| Stub Path | SoundType Enum | Used By | When Played |
+|-----------|---------------|---------|-------------|
+| Assets/Resources/audio/[name].ogg | [enumValue] | [System]/[Script.cs] | [trigger description] |
+
+### Prefabs (PrefabHierarchyObject / Scene Templates)
+
+| Stub Path | GO Name | Used By | Wiring |
+|-----------|---------|---------|--------|
+| Assets/PrefabHierarchyObject/[Name].glb | [Name] | [System]/[Script.cs] `_pfFieldName` | [SerializeField] |
+
+### Fonts
+
+| Stub Path | Used By | Import Settings |
+|-----------|---------|----------------|
+| Assets/Font/[name].ttf | [TMP component / UI Text] | Dynamic, [size], [atlas settings] |
+
+### Materials / Shaders (if applicable)
+
+| Stub Path | Used By | Notes |
+|-----------|---------|-------|
+| Assets/Shader/[name].json | SpriteRenderer default | URP 2D Lit |
+
+### Physics Materials (if applicable)
+
+| Stub Path | Used By | Notes |
+|-----------|---------|-------|
+| Assets/PhysicsMaterial2D/[name].json | [System]/[Script.cs] | [Purpose] |
+
+### Audio Mixer (if applicable)
+
+| Stub Path | Group | Used By |
+|-----------|-------|---------|
+| Assets/AudioMixerGroupController/[Name].json | [GroupName] | SoundManager routing |
+
+### Scene Files
+
+| Stub Path | Purpose |
+|-----------|---------|
+| Assets/SceneHierarchyObject/[Name].glb | [Description] |
+
+---
+
+**Phase-scoped rule:** ONLY list assets that scripts in THIS phase directly reference.
+Assets used only by later phases belong in THEIR guide, even if the stub file is shared.
+```
+
+**How to build this section (agent instructions):**
+
+1. **Deep-read `entire-{project}.stub`** — scan ALL asset categories: `Texture2D/`, `Sprite/`, `Resources/audio/`, `PrefabHierarchyObject/`, `Font/`, `Shader/`, `PhysicsMaterial2D/`, `AudioMixer*`, `SceneHierarchyObject/`, `Mesh/`
+2. **Deep-read EVERY `.cs` file in this phase** — extract:
+   - `[SerializeField]` fields of type `Sprite`, `GameObject`, `Material`, `AudioClip`, `Font`, `TMP_FontAsset`
+   - Any `Resources.Load<T>("path")` calls
+   - String constants used as sorting layer names, layer names, tag names, animator params
+   - Any reference to prefab instantiation (`Instantiate(prefab)`)
+3. **Deep-read the ORIGINAL source** in `MAIN-SOURCE/{project}/` for the same scripts — the phase version may have simplified away references that still need importing
+4. **Cross-reference** — for each code reference, find the exact stub path. If a sprite sheet has multiple slices, list the slice names from the `Assets/Sprite/` JSON entries
+5. **Leave NOTHING out** — if a script touches it, it's listed. Err on side of completeness
+
+---
+
+### 12. `## Art & Scene Work (Non-Script)` (if applicable)
 
 ```markdown
 ## Art & Scene Work (Non-Script)

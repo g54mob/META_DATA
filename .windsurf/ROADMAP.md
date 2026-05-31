@@ -15,7 +15,7 @@ This framework automates rebuilding Unity3D games from decompiled source into cl
 - **22 slash commands** (`/init`, `/build-phase`, `/audit-phase`, etc.) that automate the entire lifecycle
 - **15 template files** defining universal architecture rules, naming conventions, and doc formats
 - **18 domain skills** providing deep Unity knowledge (audio, FSM, save-load, networking, etc.)
-- **Always-on context** via `CLAUDE.md` so every response knows your architecture
+- **Always-on context** via `project-guidelines.md` so every Windsurf response knows your architecture
 - **Self-evolving tools** (`/rebuild-templates`, `/rebuild-prompts`) that keep the framework current as conventions evolve
 
 See [MANUAL.md](MANUAL.md) for detailed usage of every command.
@@ -28,7 +28,7 @@ See [MANUAL.md](MANUAL.md) for detailed usage of every command.
 |-----------|-------|---------------|
 | Single-player MonoBehaviour games | 9/10 | Built for this. Near-complete coverage of every workflow step. |
 | Architecture rule depth | 10/10 | 2633-line GOAL-general.md — naming, roles, decoupling, pitfalls, code examples |
-| Agent automation pipeline | 9/10 | 22 commands covering full lifecycle. Self-auditing. Self-evolving. |
+| Agent automation pipeline | 9/10 | 22 prompts covering full lifecycle. Self-auditing. Self-evolving. |
 | Documentation methodology | 10/10 | GUIDE + FLOW + Dependency per system. surfer.md reasoning log. Estimate calibration |
 | Decoupling framework | 9/10 | 5 Bridge variants, 5 system shapes, portability levels, interface ownership maps |
 | Multiplayer readiness | 4/10 | Networking skill with FishNet/Photon patterns. No GOAL integration or project profile yet. |
@@ -44,7 +44,7 @@ See [MANUAL.md](MANUAL.md) for detailed usage of every command.
 
 ---
 
-## What Works Well Today
+## What Works Well Today (with examples)
 
 ### Full project lifecycle automation
 
@@ -89,6 +89,8 @@ AutoMinerSystem (❌)     → concrete dep on OrePiecePoolManager — intentiona
 ## Compatibility Gaps
 
 ### Multiplayer (FPS / Co-op / MMO)
+
+The framework has zero networking support. Here's what's missing and why it matters:
 
 | Gap | Why It Matters | Example |
 |-----|---------------|---------|
@@ -152,7 +154,7 @@ AutoMinerSystem (❌)     → concrete dep on OrePiecePoolManager — intentiona
 
 These extend the framework for broader use:
 
-- [ ] **`test-runner` command** — auto-generate NUnit tests for DataServices
+- [ ] **`test-runner` prompt** — auto-generate NUnit tests for DataServices
 
   ```
   Example: /test-runner generates:
@@ -221,6 +223,8 @@ These extend the framework for broader use:
 
 ### Priority 3 — Long-Term Vision
 
+These are speculative — may or may not happen:
+
 - [ ] **GOAL-general-dots.md** — completely separate architecture rules for ECS/DOTS projects
 - [ ] **Multiplayer bridge variants** — `NetworkBridge`, `AuthoritativeBridge`, `ReplicatedBridge`
 - [ ] **Procgen phase concept** — generation pipeline vs gameplay pipeline as separate phase types
@@ -231,19 +235,19 @@ These extend the framework for broader use:
 
 ## How to Contribute
 
-### Adding a new command
+### Adding a new prompt
 
-1. Create `.windsurf/commands/your-command.md` with YAML frontmatter (`description: "..."`)
-2. Follow the 2-phase gate pattern if the command modifies files (Phase 1 = analyze + report, Phase 2 = apply after approval)
-3. Update `MANUAL.md` — add to trigger list, quick reference table, detailed section, typical workflow
-4. Update `CLAUDE.md` — add to commands table
-5. Run `/rebuild-prompts` to verify the new command doesn't conflict with existing ones
+1. Create `.windsurf/workflows/your-command.md` with YAML frontmatter (`description: "..."`)
+2. Follow the 2-phase gate pattern if the prompt modifies files (Phase 1 = analyze + report, Phase 2 = apply after approval)
+3. Update `MANUAL.md` — add to trigger list, quick reference table, detailed section, typical workflow, folder structure
+4. Update `project-guidelines.md` — add to prompts listing in workspace structure
+5. Run `/rebuild-prompts` to verify the new prompt doesn't conflict with existing ones
 
 ### Extending architecture rules
 
-1. Add the rule to `.windsurf/templates/GOAL-general.md` using generic placeholders
+1. Add the rule to `.windsurf/templates/GOAL-general.md` using generic placeholders (`[SystemName]`, `[PHASE_X]`)
 2. Add any new common mistakes to `.windsurf/templates/NewAgent-general.md`
-3. Update `CLAUDE.md` conventions summary if the rule is fundamental
+3. Update `.windsurf/project-guidelines.md` conventions summary if the rule is fundamental
 4. Run `/rebuild-templates` to verify consistency
 
 ### Testing changes
@@ -252,5 +256,5 @@ After modifying any framework file:
 ```
 /audit-phase on a completed phase    → verify zero false positives on correct code
 /build-phase on next phase           → verify it produces correct deliverables
-/rebuild-prompts                     → verify all commands are consistent
+/rebuild-prompts                     → verify all prompts are consistent
 ```

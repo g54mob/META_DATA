@@ -9,6 +9,9 @@ applyTo: '**/*.cs'
 > Single source of truth for all C# coding rules. Referenced by prompts, templates, and always-on context.
 > Full detail with gold-standard code examples lives in `.github/templates/GOAL-general.md`.
 
+> **ALL naming and capitalization rules in this file are STRICTLY ENFORCED — no exceptions.**
+> camelCase for enum values/fields/locals, PascalCase for classes/methods, `_camelCase` for SerializeField — every single convention below is critical. Violating even one (e.g. writing `None` instead of `none` for an enum value) is a defect that must be fixed immediately. When in doubt, check the tables below before writing any identifier.
+
 ---
 
 ## Core Principle

@@ -12,12 +12,13 @@
 
 This framework automates rebuilding Unity3D games from decompiled source into clean, testable architectures. It provides:
 
-- **12 slash commands** (`/init`, `/build-phase`, `/audit-phase`, etc.) that automate the entire lifecycle
-- **5 template files** defining universal architecture rules, naming conventions, and doc formats
+- **22 slash commands** (`/init`, `/build-phase`, `/audit-phase`, etc.) that automate the entire lifecycle
+- **15 template files** defining universal architecture rules, naming conventions, and doc formats
+- **18 domain skills** providing deep Unity knowledge (audio, FSM, save-load, networking, etc.)
 - **Always-on context** via `copilot-instructions.md` so every Copilot response knows your architecture
 - **Self-evolving tools** (`/rebuild-templates`, `/rebuild-prompts`) that keep the framework current as conventions evolve
 
-See [Manual.md](Manual.md) for detailed usage of every command.
+See [MANUAL.md](MANUAL.md) for detailed usage of every command.
 
 ---
 
@@ -26,19 +27,18 @@ See [Manual.md](Manual.md) for detailed usage of every command.
 | Dimension | Score | What It Means |
 |-----------|-------|---------------|
 | Single-player MonoBehaviour games | 9/10 | Built for this. Near-complete coverage of every workflow step. |
-| Architecture rule depth | 10/10 | 1,942-line GOAL-general.md — naming, roles, decoupling, pitfalls, code examples |
-| Agent automation pipeline | 9/10 | 12 prompts covering full lifecycle. Self-auditing. Self-evolving. |
+| Architecture rule depth | 10/10 | 2633-line GOAL-general.md — naming, roles, decoupling, pitfalls, code examples |
+| Agent automation pipeline | 9/10 | 22 prompts covering full lifecycle. Self-auditing. Self-evolving. |
 | Documentation methodology | 10/10 | GUIDE + FLOW + Dependency per system. surfer.md reasoning log. Estimate calibration |
 | Decoupling framework | 9/10 | 5 Bridge variants, 5 system shapes, portability levels, interface ownership maps |
 | Multiplayer readiness | 4/10 | Networking skill with FishNet/Photon patterns. No GOAL integration or project profile yet. |
 | VR/XR readiness | 2/10 | Input model and UI patterns are screen-only |
 | Mobile readiness | 3/10 | No touch input, no battery/memory constraints |
 | ECS/DOTS readiness | 1/10 | Architecturally incompatible — role taxonomy is MonoBehaviour-native |
-| Project-agnostic reusability | 8/10 | 13 skills with genre variants. All existing skills expanded for multi-genre. |
+| Project-agnostic reusability | 8/10 | 18 skills with genre variants. All existing skills expanded for multi-genre. |
 
-> **May 2026 update:** 8 new domain skills added (save-load, FSM, day-night, AI-navigation, 
-> networking, quest, procedural-gen, camera). All 5 original skills expanded with genre variants. 
-> Coverage went from 5 domains to 13.
+> **May 2026 update:** 13 new domain skills added since inception. All original skills expanded 
+> with genre variants. Coverage went from 5 domains to 18. 41 projects registered in workspace.
 
 **Overall: 9/10 for single-player MonoBehaviour games. 7/10 as a universal Unity framework.**
 
@@ -49,7 +49,7 @@ See [Manual.md](Manual.md) for detailed usage of every command.
 ### Full project lifecycle automation
 
 ```
-/init           → reads 200 decompiled .cs files, produces 12 docs + phase-All/ in one run
+/init           → reads 200+ decompiled .cs files, produces 12 docs + phase-All/ in one run
 /build-phase    → generates 25 scripts + GUIDE + FLOW + tests for one phase
 /audit-phase    → compares every method against original source: ✅/❌/⚠️
 ```
@@ -66,7 +66,7 @@ Example: Agent generates FindObjectOfType<PlayerMovement>() in ShopUI.cs
 
 ### Self-evolution
 
-After completing 5 phases, conventions evolved (e.g., bridges moved to non-portable side, #region ordering changed). The framework updates itself:
+After completing phases, conventions evolve. The framework updates itself:
 
 ```
 /rebuild-templates → "🔴 Critical: Template says bridge on consumer side — code puts it on non-portable side"
@@ -144,19 +144,17 @@ The framework has zero networking support. Here's what's missing and why it matt
 
 ### Priority 1 — Ship Current Project First
 
-These must happen before starting any new project:
-
-- [ ] **Add README.md** to repo root (~50 lines — what is this, how to use prompts, where to start)
-- [ ] **Add .gitignore** (exclude node_modules/, dist/, *.txt pack files)
+- [ ] **Add README.md** to repo root
+- [ ] **Add .gitignore**
 - [ ] **Add LICENSE**
 - [ ] **Run `/update-goal-from-handtyped`** — reconcile UtilsPhaseA/B vs centralized Utils.cs convention
-- [ ] **Hand-type remaining phases** B through J (~137h estimated)
+- [ ] **Hand-type remaining phases**
 
 ### Priority 2 — Framework Improvements (After Shipping)
 
 These extend the framework for broader use:
 
-- [ ] **`test-runner.prompt.md`** — auto-generate NUnit tests for DataServices
+- [ ] **`test-runner` prompt** — auto-generate NUnit tests for DataServices
 
   ```
   Example: /test-runner generates:
@@ -230,8 +228,8 @@ These are speculative — may or may not happen:
 - [ ] **GOAL-general-dots.md** — completely separate architecture rules for ECS/DOTS projects
 - [ ] **Multiplayer bridge variants** — `NetworkBridge`, `AuthoritativeBridge`, `ReplicatedBridge`
 - [ ] **Procgen phase concept** — generation pipeline vs gameplay pipeline as separate phase types
-- [ ] **Cross-project template sharing** — extract `.github/` into a git submodule or npm package so multiple repositories share the same templates and prompts
-- [ ] **`/migrate-profile`** — convert a singleplayer project to multiplayer by adding network patterns to existing systems
+- [ ] **Cross-project template sharing** — extract `.github/` into a shareable package
+- [ ] **`/migrate-profile`** — convert a singleplayer project to multiplayer
 
 ---
 
@@ -239,9 +237,9 @@ These are speculative — may or may not happen:
 
 ### Adding a new prompt
 
-1. Create `.github/prompts/your-command.prompt.md` with YAML frontmatter (`mode: agent`, `description: "..."`)
+1. Create `.github/prompts/your-command.prompt.md` with YAML frontmatter (`description: "..."`)
 2. Follow the 2-phase gate pattern if the prompt modifies files (Phase 1 = analyze + report, Phase 2 = apply after approval)
-3. Update `Manual.md` — add to trigger list, quick reference table, detailed section, typical workflow, folder structure
+3. Update `MANUAL.md` — add to trigger list, quick reference table, detailed section, typical workflow, folder structure
 4. Update `copilot-instructions.md` — add to prompts listing in workspace structure
 5. Run `/rebuild-prompts` to verify the new prompt doesn't conflict with existing ones
 

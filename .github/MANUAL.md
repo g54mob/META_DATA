@@ -202,7 +202,7 @@ ROOT/
 **What it reads:**
 - `MAIN-SOURCE/{PROJECT}/` — all raw `.cs` files (Assembly-CSharp)
 - `MAIN-SOURCE/entire-{PROJECT}.stub` — full file hierarchy including excluded assets
-- `.github/templates/` — ALL 14 template files (ARCHITECTURE, PhaseMap, StructureMap, Estimate, portability maps, GameStateSoFar, etc.)
+- `.github/templates/` — ALL 15 template files (ARCHITECTURE, PhaseMap, StructureMap, Estimate, portability maps, GameStateSoFar, GUIDE, etc.)
 - `.github/templates/GOAL-general.md` — universal architecture rules template
 - `.github/templates/NewAgent-general.md` — universal agent instruction template
 

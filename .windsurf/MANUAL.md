@@ -1,14 +1,14 @@
 # Windsurf Workflows — Usage Guide
 
-> **Who is this for?** Anyone using this workspace for the first time. This guide explains every workflow available, what it does, when to use it, and exactly what to expect when you run it.
+> **Who is this for?** Anyone using this workspace for the first time. This guide explains every slash command available, what it does, when to use it, and exactly what to expect when you run it.
 >
-> **What are workflows?** They're automated multi-step tasks. Type `/` in Windsurf's Cascade chat, pick a workflow, and the agent follows the steps defined in a `.md` file under `.windsurf/workflows/`. You don't need to know what's inside the workflow file — just when to use each one.
+> **What are workflows?** They're automated workflows. Type `/` in Cascade chat, pick a command from the dropdown, and the agent follows the steps defined in a `.md` file. You don't need to know what's inside the workflow file — just when to use each command.
 
 ---
 
 ## How to Trigger
 
-In Windsurf's Cascade chat chat, type `/` followed by the command name. The agent reads the command file and executes every step automatically.
+In VS Code's Cascade chat panel, type `/` followed by the command name. A dropdown appears — select it and press Enter. The agent reads the `.md` file and executes every step automatically.
 
 ```
 /init                         → bootstrap a new project
@@ -25,7 +25,7 @@ In Windsurf's Cascade chat chat, type `/` followed by the command name. The agen
 /refresh-phase-docs           → regenerate Dependency.md + GUIDE.md + FLOW.md
 /refresh-learn-docs           → rebuild all top-level LEARN/ docs
 /rebuild-templates             → backport proven patterns to templates
-/rebuild-prompts               → audit commands against real code
+/rebuild-prompts               → audit prompts against real code
 /audit-framework               → multi-project framework health check
 /implement-audit-todo          → apply framework improvements from source
 /move-system                  → relocate system between phases
@@ -54,14 +54,12 @@ In Windsurf's Cascade chat chat, type `/` followed by the command name. The agen
 | `/refresh-phase-docs` | Regenerate all Dependency.md + GUIDE.md + FLOW.md for a phase | After edits, after /decouple-check fixes | Phase docs feel stale or inconsistent |
 | `/refresh-learn-docs` | Rebuild all top-level LEARN/ docs from actual code | After multiple phases done, after major refactors | PhaseMap/StructureMap/portability maps outdated |
 | `/rebuild-templates` | Extract proven conventions → update templates | After 3+ phases or before new project | Templates feel stale |
-| `/rebuild-prompts` | Audit command files against real code patterns | After 3+ phases | Commands produce false positives |
-| `/audit-framework` | Multi-project framework gap analysis | Before adding new genre, after 2+ projects | Framework feels insufficient for new domain |
-| `/implement-audit-todo` | Deep-read source → create/update skills, conventions, templates, commands | After `/audit-framework`, when TODO list exists | Gap report ready, MAIN-SOURCE/ available |
+| `/rebuild-prompts` | Audit workflow files against real code patterns | After 3+ phases | Prompts produce false positives || `/audit-framework` | Multi-project framework gap analysis | Before adding new genre, after 2+ projects | Framework feels insufficient for new domain |
+| `/implement-audit-todo` | Deep-read source → create/update skills, conventions, templates, prompts | After `/audit-framework`, when TODO list exists | Gap report ready, MAIN-SOURCE/ available |
 | `/project-overview` | Brief overview — genre, asset counts, build hours by category (chat only) | Before `/init`, anytime | Evaluating a new project, estimating scope |
 | `/move-system` | Relocate a system from one phase to another | As needed | System in wrong phase, phase rebalancing, dependency correction |
 | `/merge-phase` | Combine two adjacent underpopulated phases | As needed | Phases too small, simplifying structure |
 | `/refresh-workspace-reg` | Rescan all projects, recount files, rebuild registry | After new projects added, skills change | WORKSPACE-REG.md feels stale |
-
 ---
 
 ## Workspace Layout
@@ -69,15 +67,69 @@ In Windsurf's Cascade chat chat, type `/` followed by the command name. The agen
 ```
 ROOT/
 ├── .windsurf/
-│   ├── rules/                        ← always-on + glob-scoped rules (C# conventions, architecture)
-│   ├── workflows/                    ← slash commands (type /workflow-name in Cascade)
-│   ├── skills/                       ← domain knowledge (referenced via @skill-name)
-│   ├── templates/                    ← doc generation formats
-│   ├── WORKSPACE-REG.md             ← project registry (quick-lookup: scale, genre, skills, status)
-│   ├── MANUAL.md                    ← this file
-│   ├── ROADMAP.md                   ← framework maturity & future plans
-│   └── v1.2.ver                     ← version marker
-├── .github/                          ← GitHub Copilot config (parallel — same content, different format)
+│   ├── project-guidelines.md       ← always-on context (architecture summary + critical behavior)
+│   ├── Manual.md                     ← this file
+│   ├── WORKSPACE-REG.md              ← project registry (quick-lookup: scale, genre, skills, status)
+│   ├── ROADMAP.md                    ← high-level project roadmap
+│   ├── instructions/
+│   │   └── csharp-conventions.instructions.md ← C# rules (auto-applied to *.cs)
+│   ├── skills/
+│   │   ├── unity-testing/SKILL.md         ← vertical slice test patterns, data-first DEBUG_Check
+│   │   ├── unity-scene-setup/SKILL.md     ← URP config, lighting profiles, materials, prefab placement
+│   │   ├── unity-audio/SKILL.md           ← pool-based SoundManager, SoundDefinitions, FMOD variant
+│   │   ├── unity-animation/SKILL.md       ← AnimatorControllers, code-driven rotation, Spine/DOTween variants
+│   │   ├── unity-prefab-hierarchy/SKILL.md ← prefab GO structure, universal patterns, genre variants
+│   │   ├── unity-save-load/SKILL.md       ← ISaveable, SaveData, SaveManager, JSON, save slots
+│   │   ├── unity-fsm/SKILL.md             ← IState, StateMachine, AI/gameplay/UI state machines
+│   │   ├── unity-day-night/SKILL.md       ← DayNightCycle, TimePhase, lighting gradients
+│   │   ├── unity-ai-navigation/SKILL.md   ← NavMeshAgent + FSM, patrol, A*Pathfinding variant
+│   │   ├── unity-networking/SKILL.md      ← FishNet/Photon, client/server tiers, RPC patterns
+│   │   ├── unity-quest/SKILL.md           ← SO_QuestDef, WQuest, objective tracking
+│   │   ├── unity-procedural-gen/SKILL.md  ← SeededRandom, Perlin terrain, chunk generation
+│   │   ├── unity-camera/SKILL.md          ← Cinemachine VCams, manual camera rigs, screen shake
+│   │   ├── unity-dialogue/SKILL.md        ← DialogueManager, Ink/Yarn/PixelCrushers, branching trees
+│   │   ├── unity-input/SKILL.md           ← New Input System, InputActions, rebinding, context switching
+│   │   ├── unity-physics/SKILL.md         ← Rigidbody, joints, ragdoll, raycasting, trigger zones
+│   │   ├── unity-inventory/SKILL.md       ← slot-based inventory, stacking, drag-drop, equipment
+│   │   └── unity-grid-building/SKILL.md   ← grid placement, ghost preview, validation, snapping
+│   ├── templates/
+│   │   ├── ARCHITECTURE-template.md   ← source code analysis format
+│   │   ├── GOAL-general.md           ← universal architecture rules template
+│   │   ├── NewAgent-general.md       ← universal agent instruction template
+│   │   ├── GUIDE-template.md         ← per-phase GUIDE.md section format
+│   │   ├── FLOW-template.md          ← per-phase FLOW.md section format
+│   │   ├── Dependency-template.md    ← per-system Dependency.md format
+│   │   ├── PhaseMap-template.md      ← PhaseMap.md structure
+│   │   ├── StructureMap-template.md  ← StructureMap.md structure
+│   │   ├── SystemPortabilityMap-template.md ← portability analysis format
+│   │   ├── SystemIsolationAnalysis-template.md ← isolation analysis format
+│   │   ├── CoverageMap-template.md   ← source coverage tracking format
+│   │   ├── Estimate-template.md      ← typing timeline format
+│   │   ├── OptionalFeatures-template.md ← optional features format
+│   │   ├── GameStateSoFar-template.md ← progressive gameplay state guide format
+│   │   └── surfer-template.md        ← reasoning log format
+│   └── prompts/
+│       ├── init.md            ← /init — bootstrap docs from raw source
+│       ├── build-phase.md     ← /build-phase — generate one phase
+│       ├── audit-phase.md     ← /audit-phase — post-delivery audit
+│       ├── source-fidelity-check.md ← /source-fidelity-check — deep source analysis (ask mode)
+│       ├── decouple-check.md  ← /decouple-check — coupling scan
+│       ├── cross-phase-mod.md ← /cross-phase-mod — earlier-phase deps
+│       ├── post-delivery-sync.md    ← /post-delivery-sync — sync living docs
+│       ├── update-goal-from-handtyped.md ← /update-goal-from-handtyped
+│       ├── add-system-to-phase.md   ← /add-system-to-phase
+│       ├── refactor-interface.md    ← /refactor-interface
+│       ├── evolve-shared-infra.md   ← /evolve-shared-infra
+│       ├── refresh-phase-docs.md    ← /refresh-phase-docs — regen phase docs
+│       ├── refresh-learn-docs.md    ← /refresh-learn-docs — rebuild LEARN/ docs
+│       ├── rebuild-templates.md     ← /rebuild-templates — backport conventions
+│       ├── rebuild-prompts.md       ← /rebuild-prompts — audit prompts vs code
+│       ├── audit-framework.md       ← /audit-framework — multi-project framework health
+│       ├── implement-audit-todo.md   ← /implement-audit-todo — apply improvements from source
+│       ├── project-overview.md        ← /project-overview — quick project analysis (chat only)
+│       ├── move-system.md             ← /move-system — relocate system between phases
+│       ├── merge-phase.md             ← /merge-phase — combine underpopulated phases
+│       └── refresh-workspace-reg.md   ← /refresh-workspace-reg — rescan & rebuild registry
 ├── MAIN-SOURCE/
 │   ├── {project}/                    ← raw source (READ-ONLY — never modify)
 │   └── entire-{project}.stub        ← full file hierarchy including excluded assets
@@ -104,14 +156,14 @@ ROOT/
 
 ## Skills (Domain Knowledge)
 
-**What are skills?** Skills are `.md` files in `.windsurf/skills/` that contain domain-specific knowledge. They are NOT slash commands — you never type `/unity-audio`. Instead, commands **reference skills explicitly** when the current task matches the skill's description (e.g., implementing sound → loads `unity-audio`, building a scene → loads `unity-scene-setup`).
+**What are skills?** Skills are `.md` files in `.windsurf/skills/*/SKILL.md` that contain domain-specific knowledge. They are NOT workflows — you never type `/unity-audio`. Instead, Windsurf **automatically loads** a skill when the current task matches the skill's description (e.g., implementing sound → loads `unity-audio`, building a scene → loads `unity-scene-setup`).
 
-**How they work:** Each skill has YAML frontmatter with a `description` field. When a task matches, the agent reads the full skill body to get detailed patterns, code examples, and rules. Skills are progressive — they don't bloat every conversation, only the relevant ones load.
+**How they work:** Each skill has YAML frontmatter with a `description` field. Windsurf reads descriptions first (lightweight). When a task matches, it reads the full skill body to get detailed patterns, code examples, and rules. Skills are progressive — they don't bloat every conversation, only the relevant ones load.
 
 **Universal:** All skills are written to apply to ANY Unity3D project in this workspace. Examples use MINEMGL classes as concrete references — substitute with your project's equivalents.
 
-| Skill | Loads When... | Provides |
-|-------|---------------|----------|
+| Skill | Auto-Loads When... | Provides |
+|-------|---------------------|----------|
 | `unity-testing` | Writing tests, Test.md, DEBUG_Check | Vertical slice workflow, data-first testing, mock strategy, test file organization |
 | `unity-scene-setup` | Building scenes, placing prefabs, lighting | URP setup, lighting profiles, layers, materials, Shader Graph, per-phase world layout |
 | `unity-audio` | Implementing sound, wiring SoundDefinitions | Pool architecture, FMOD variant, genre audio profiles, music system |
@@ -131,11 +183,11 @@ ROOT/
 | `unity-inventory` | Item slots, stacking, drag-drop, equipment, hotbar | Slot DataService, WItem wrapper, save integration, container transfer |
 | `unity-grid-building` | Grid placement, ghost preview, building validation | Grid/free-form/node modes, footprint rotation, connection points |
 
-**When to add more skills:** If `/build-phase` or `/audit-phase` repeatedly needs domain knowledge that isn't covered, create a new skill. Run `/audit-framework` to detect coverage gaps across all projects.
+**When to add more skills:** If `/build-phase` or `/audit-phase` repeatedly needs domain knowledge that isn't covered, create a new skill folder. Run `/audit-framework` to detect coverage gaps across all projects.
 
 ---
 
-## Detailed Command Reference
+## Detailed Prompt Reference
 
 ---
 
@@ -150,7 +202,7 @@ ROOT/
 **What it reads:**
 - `MAIN-SOURCE/{PROJECT}/` — all raw `.cs` files (Assembly-CSharp)
 - `MAIN-SOURCE/entire-{PROJECT}.stub` — full file hierarchy including excluded assets
-- `.windsurf/templates/` — ALL 15 template files (ARCHITECTURE, PhaseMap, StructureMap, Estimate, portability maps, GameStateSoFar, etc.)
+- `.windsurf/templates/` — ALL 15 template files (ARCHITECTURE, PhaseMap, StructureMap, Estimate, portability maps, GameStateSoFar, GUIDE, etc.)
 - `.windsurf/templates/GOAL-general.md` — universal architecture rules template
 - `.windsurf/templates/NewAgent-general.md` — universal agent instruction template
 
@@ -223,14 +275,14 @@ ROOT/
 
 ### `/audit-phase` — Post-Delivery Self-Audit
 
-**What is this?** A thorough quality check. Goes through every script in your phase and compares it method-by-method against the original source. Also checks all architecture rules, common mistakes, pitfalls, and discovers functionality that was MISSED from the original source.
+**What is this?** A thorough quality check. Goes through every script in your phase and compares it method-by-method against the original source. Also checks all architecture rules, common mistakes, pitfalls, and now discovers functionality that was MISSED from the original source.
 
 **Frequency:** Runs automatically after every `/build-phase`. Also run it manually anytime you make changes to a phase. Re-runnable — running it twice on the same phase re-analyzes everything from scratch.
 
-**Example situation:** `/build-phase` just delivered phase-b (inventory system). The audit auto-runs and finds: (1) `DropItem()` coroutine was missed from source — Critical, (2) a `FindObjectOfType` slipped in — architecture violation, (3) two public methods nobody calls — wasted API surface. It fixes what it can and flags the rest.
+**Example situation:** `/build-phase` just delivered phase-b (inventory system). The audit auto-runs and finds: (1) `DropItem()` coroutine was missed from source — 🔴 Critical, (2) a `FindObjectOfType` slipped in — architecture violation, (3) two public methods nobody calls — wasted API surface. It fixes what it can and flags the rest.
 
 **What it checks:**
-1. **Source fidelity** — every public method/field compared to original
+1. **Source fidelity** — every public method/field compared to original (✅/❌/⚠️)
 2. **Unlisted functionality discovery** — scans ALL source files in the domain, not just mapped ones. Classifies missed items as Critical/Important/Nice-to-have
 3. **Architecture violations** — FindObjectOfType, public methods nobody calls, missing `// purpose:`, SO_ with methods, raw string tags, raw string animator params, `!` instead of `== false`, GameEvents with concrete types, 80% rule
 4. **17 Common Agent Mistakes** — full list from NewAgent.md
@@ -257,10 +309,10 @@ ROOT/
 - `LEARN/{PROJECT}/PhaseMap.md`, `StructureMap.md`, `CoverageMap.md`, `OptionalFeatures.md`
 
 **What it outputs (CHAT ONLY — no file modifications):**
-- Critical gaps — phase breaks without these
-- Important gaps — players notice the absence
-- Nice-to-have — polish/VFX/audio/edge cases
-- Dead/unused code — documented and skipped
+- 🔴 Critical gaps — phase breaks without these
+- 🟡 Important gaps — players notice the absence
+- 🟢 Nice-to-have — polish/VFX/audio/edge cases
+- ⚪ Dead/unused code — documented and skipped
 - Files not assigned to any phase
 - Suggested updates to PhaseMap, StructureMap, OptionalFeatures.md
 
@@ -280,7 +332,7 @@ ROOT/
 
 **Frequency:** Runs automatically after every `/build-phase`. Also run it manually after editing any system, especially if you added imports or changed how systems communicate.
 
-**Example situation:** You modified `InventorySystem` to check the player's health before allowing item use. You added `using phase_b._Systems.HealthSystem;` and `HealthDataService.GetHealth()` directly. You run `/decouple-check` and it flags this as a concrete dependency. It suggests: either add a `GameEvent OnHealthRequested` that HealthSystem responds to, or create an `IHealthProvider` interface that InventorySystem consumes.
+**Example situation:** You modified `InventorySystem` to check the player's health before allowing item use. You added `using phase_b._Systems.HealthSystem;` and `HealthDataService.GetHealth()` directly. You run `/decouple-check` and it flags this as a concrete dependency (❌). It suggests: either add a `GameEvent OnHealthRequested` that HealthSystem responds to, or create an `IHealthProvider` interface that InventorySystem consumes.
 
 **How it works:**
 1. Scans every `.cs` in target `_-Systems/` — classifies deps as FREE / interface / concrete
@@ -305,7 +357,7 @@ ROOT/
 
 **Frequency:** Runs automatically after every `/build-phase`. Also run it manually before you start hand-typing a new phase — so you know exactly what earlier-phase files need modifications.
 
-**Example situation:** Phase-c (combat) needs `PlayerController` (from phase-a) to implement `IDamageable` and have a `TakeDamage(int amount)` method. You run `/cross-phase-mod` and it outputs: "phase-a/PlayerController.cs → add `: IDamageable` to class declaration, add `TakeDamage()` method — Impact: Direct modify". It gives you the exact code diff with `// ← ADD` markers.
+**Example situation:** Phase-c (combat) needs `PlayerController` (from phase-a) to implement `IDamageable` and have a `TakeDamage(int amount)` method. You run `/cross-phase-mod` and it outputs: "phase-a/PlayerController.cs → add `: IDamageable` to class declaration, add `TakeDamage()` method — Impact: ⚠️ Direct modify". It gives you the exact code diff with `// ← ADD` markers.
 
 **What it does:**
 - Reads all `.cs` in target phase
@@ -315,7 +367,7 @@ ROOT/
 - Enforces conventions on generated code (interface-only GameEvents, `// purpose:`, camelCase enums, `== false`, `LogSubscribersCount()`)
 - Verifies earlier phases still compile after mods (compile gate)
 
-**Impact ratings:** Non-breaking, Direct modify, Breaking
+**Impact ratings:** ❌ Non-breaking, ⚠️ Direct modify, 🔴 Breaking
 
 **Updates:** GUIDE.md modifications table, FLOW.md event registry, earlier-phase Dependency.md files.
 
@@ -527,26 +579,26 @@ Updates all template files. Verifies no project-specific names leaked.
 
 ---
 
-### `/rebuild-prompts` — Audit Command Files Against Real Code
+### `/rebuild-prompts` — Audit Prompt Files Against Real Code
 
-**What is this?** Command files (`.windsurf/workflows/*.md`) tell the agent what to do. But as your code evolves, commands can become stale — they might instruct patterns you've abandoned or miss patterns you've adopted. This command reads your actual code and audits every command for accuracy.
+**What is this?** Prompt files (`.windsurf/workflows/*.md`) tell the agent what to do. But as your code evolves, prompts can become stale — they might instruct patterns you've abandoned or miss patterns you've adopted. This command reads your actual code and audits every prompt for accuracy.
 
-**Frequency:** After 3+ phases are hand-typed. Or when `/audit-phase` flags something as a "violation" that you know is correct in your code — that means the audit command is wrong.
+**Frequency:** After 3+ phases are hand-typed. Or when `/audit-phase` flags something as a "violation" that you know is correct in your code — that means the audit prompt is wrong.
 
-**Example situation:** `/audit-phase` keeps flagging your `BridgeHealthContext` as a violation because it has a `{ get; private set; }` property. But GOAL.md says Bridge static accessors are an allowed exception. The audit command's violation list is incomplete. You run `/rebuild-prompts` and it finds: "audit-phase step 6 missing: Bridge static accessor exception for properties".
+**Example situation:** `/audit-phase` keeps flagging your `BridgeHealthContext` as a violation because it has a `{ get; private set; }` property. But GOAL.md says Bridge static accessors are an allowed exception. The audit prompt's violation list is incomplete. You run `/rebuild-prompts` and it finds: "audit-phase step 6 missing: Bridge static accessor exception for properties".
 
 **How it works (2-phase gate):**
 
 **Phase 1 — Deep Extraction (13 areas):**
-Scans every `.cs` and `.md` across all phases. Produces per-command gap report:
-- **Correct** — steps that match reality
-- **Wrong** — steps that contradict actual code
-- **Missing** — things code does that commands don't instruct
+Scans every `.cs` and `.md` across all phases. Produces per-prompt gap report:
+- **Correct ✅** — steps that match reality
+- **Wrong ❌** — steps that contradict actual code
+- **Missing ➕** — things code does that prompts don't instruct
 
-Severity: High (wrong output / false positive), Medium (misses something), Low (minor)
+Severity: 🔴 High (wrong output / false positive), 🟡 Medium (misses something), 🟢 Low (minor)
 
 **Phase 2 — Apply (after user approval):**
-Updates each command file. Validates zero false positives.
+Updates each workflow file. Validates zero false positives.
 
 **Key behavior:** STOPS after gap report, waits for your confirmation before modifying anything.
 
@@ -556,26 +608,29 @@ Updates each command file. Validates zero false positives.
 
 ### `/audit-framework` — Multi-Project Framework Health Check
 
-**What is this?** A meta-audit of the entire `.windsurf/` framework. Instead of checking one project's code against one command, this scans ALL projects in the workspace and asks: "Does this framework handle every Unity3D genre well?" It finds missing skills, template gaps, command blind spots, and convention holes that only surface when you work across horror, survival, co-op, scheduling, and other diverse game types.
+**What is this?** A meta-audit of the entire `.windsurf/` framework. Instead of checking one project's code against one prompt, this scans ALL projects in the workspace and asks: "Does this framework handle every Unity3D genre well?" It finds missing skills, template gaps, prompt blind spots, and convention holes that only surface when you work across horror, survival, co-op, scheduling, and other diverse game types.
 
 **Frequency:** Before adding a new project with a different genre. After 2+ projects are complete. Whenever the framework feels insufficient for a new domain.
 
-**Example situation:** You've completed a mining game rebuild. Now you're about to start a horror game (`MAIN-SOURCE/horror-game/`). The horror game uses NavMesh AI, dynamic lighting, jump-scare timing systems, and dialogue trees — none of which are covered by existing skills or tested by existing commands. You run `/audit-framework` and it identifies: (1) No AI/NavMesh skill exists — Critical, (2) `unity-scene-setup` assumes static lighting (horror needs dynamic) — template gap, (3) `/build-phase` doesn't handle timing-based behavior patterns — command blind spot. It produces a prioritized action list and waits for your approval before fixing anything.
+**Example situation:** You've completed a mining game rebuild. Now you're about to start a horror game (`MAIN-SOURCE/horror-game/`). The horror game uses NavMesh AI, dynamic lighting, jump-scare timing systems, and dialogue trees — none of which are covered by existing skills or tested by existing prompts. You run `/audit-framework` and it identifies: (1) No AI/NavMesh skill exists — 🔴 Critical, (2) `unity-scene-setup` assumes static lighting (horror needs dynamic) — template gap, (3) `/build-phase` doesn't handle timing-based behavior patterns — prompt blind spot. It produces a prioritized action list and waits for your approval before fixing anything.
 
 **What it reads:**
 - ALL `MAIN-SOURCE/*/` project folders (or their ARCHITECTURE.md summaries)
 - ALL `LEARN/*/` project folders (phases, scripts, docs)
-- The entire `.windsurf/` framework: CLAUDE.md, all skills, all templates, all commands, all conventions
+- The entire `.windsurf/` framework: project-guidelines.md, all skills, all templates, all prompts, all conventions
 
 **What it produces (Phase 1 — read-only):**
-- **Skills gap matrix** — domain areas needed vs covered (with priority)
+- **Skills gap matrix** — domain areas needed vs covered (with priority: 🔴/🟡/🟢)
 - **Genre-blind assumptions** in existing skills/templates
 - **Template gaps** — patterns missing for specific genres
-- **Command blind spots** — steps that break for certain game types
+- **Prompt blind spots** — steps that break for certain game types
 - **Convention holes** — C# patterns not covered (async, state machines, pooling, etc.)
 - **Cross-project drift** — inconsistencies between projects using the same framework
 - **Recommended new skills** with priority and scope
 - **Prioritized action list** (Critical / Important / Nice-to-have)
+
+**Phase 2 (after approval):**
+Creates new skills, updates templates/workflows/conventions, updates Manual.md and project-guidelines.md to register new additions.
 
 **Key behavior:** STOPS after gap report. Asks "Which items should I implement?" Waits for your confirmation before modifying any `.windsurf/` files.
 
@@ -585,38 +640,39 @@ Updates each command file. Validates zero false positives.
 
 ### `/implement-audit-todo` — Apply Framework Improvements from Source
 
-**What is this?** The implementation companion to `/audit-framework`. While `/audit-framework` identifies gaps (producing a TODO list), this command does the heavy lifting — it reads `MAIN-SOURCE/` projects, extracts REAL code patterns, and implements changes: creating new skills, adding genre variants to existing skills, modifying conventions, templates, and commands. Works with any gap report — not hardcoded to a specific TODO.
+**What is this?** The implementation companion to `/audit-framework`. While `/audit-framework` identifies gaps (producing a TODO list), this prompt does the heavy lifting — it reads `MAIN-SOURCE/` projects, extracts REAL code patterns, and implements changes: creating new skills, adding genre variants to existing skills, modifying conventions, templates, and prompts. Works with any gap report — not hardcoded to a specific TODO.
 
-**Frequency:** After `/audit-framework` produces a gap report. When an `audit-required-todo.md` (or similar) file exists and you're ready to implement. When you know exactly what framework changes are needed.
+**Frequency:** After `/audit-framework` produces a gap report. When a `audit-required-todo.md` (or similar) file exists and you're ready to implement. When you know exactly what framework changes are needed.
 
-**Example situation:** `/audit-framework` found that 8 projects need save/load patterns and no `unity-save-load` skill exists. The TODO was written to `audit-required-todo.md`. You run `/implement-audit-todo`, point it at the TODO file, say "critical only". It reads `SaveManager.cs`, `ISaveable.cs`, `LoadManager.cs` across minemgl, schedule-1, smarket — compares their approaches — finds 5 projects use ISaveable+JSON, 2 use ES3, 1 uses PlayerPrefs. It creates `unity-save-load.md` with real code examples from source, registers it everywhere, then moves to the next critical item.
+**Example situation:** `/audit-framework` found that 8 projects need save/load patterns and no `unity-save-load` skill exists. The TODO was written to `audit-required-todo.md`. You move to the workspace with all `MAIN-SOURCE/` projects. You run `/implement-audit-todo`, point it at the TODO file, say "critical only". It reads `SaveManager.cs`, `ISaveable.cs`, `LoadManager.cs` across minemgl, schedule-1, smarket — compares their approaches — finds 5 projects use ISaveable+JSON, 2 use ES3, 1 uses PlayerPrefs. It creates `unity-save-load/SKILL.md` with real code examples from source, registers it everywhere, then moves to the next critical item.
 
-**Requirements:** `MAIN-SOURCE/` must exist with project source — this command extracts real code, it cannot work from outlines alone.
+**Requirements:** `MAIN-SOURCE/` must exist with project source — this prompt extracts real code, it cannot work from outlines alone.
 
 **What it reads:**
 - Gap report file (default: `.windsurf/audit-required-todo.md`) or user instructions
 - `MAIN-SOURCE/*/` — ALL `.cs` files for relevant domains
 - ALL existing `.windsurf/skills/*/SKILL.md` — format reference
-- `CLAUDE.md`, `MANUAL.md` — registration targets
+- `.windsurf/project-guidelines.md`, `Manual.md` — registration targets
 
 **How it works:**
+
 1. Reads the gap report → extracts actionable items with target file, priority, change type
 2. Asks which items to implement (all / critical only / specific numbers)
-3. Groups by type and processes in order: conventions → templates → new skills → skill updates → commands → registration
-4. For new skills: multi-strategy source scan → cross-project comparison → real code extraction → skill creation (exact existing format)
+3. Groups by type and processes in order: conventions → templates → new skills → skill updates → prompts → registration
+4. For new skills: multi-strategy source scan → cross-project comparison → real code extraction → SKILL.md creation (exact existing format)
 5. For skill updates: scans uncovered projects → drafts "Genre Variants" sections
-6. For convention/template/command edits: applies changes with universal phrasing
-7. Registers all new skills in CLAUDE.md, MANUAL.md, and command skill-reference sections
+6. For convention/template/prompt edits: applies changes with universal phrasing
+7. Registers all new skills in project-guidelines.md, Manual.md, and prompt skill-reference sections
 8. Marks completed items in the gap report file
 
 **Change types it handles:**
-- `create-skill` — new `.windsurf/skills/{name}.md` with full source extraction
+- `create-skill` — new `.windsurf/skills/{name}/SKILL.md` with full source extraction
 - `update-skill` — genre variants added to existing skills
-- `edit-convention` — rules added to `csharp-conventions.md`
+- `edit-convention` — rules added to `csharp-conventions.instructions.md`
 - `edit-template` — sections added to `templates/*.md`
-- `edit-command` — steps/checks added to `commands/*.md`
+- `edit-prompt` — steps/checks added to `prompts/*.md`
 
-**Key behavior:** Requires `MAIN-SOURCE/` for code extraction. Processes items in dependency order (conventions first, commands last). Verifies all new skills match existing format exactly.
+**Key behavior:** Requires `MAIN-SOURCE/` for code extraction. Processes items in dependency order (conventions first, prompts last). Verifies all new skills match existing format exactly.
 
 **Auto-chains:** None.
 
@@ -637,7 +693,7 @@ Updates each command file. Validates zero false positives.
 4. **Regenerates docs** — updates PhaseMap.md, StructureMap.md, GUIDE.md (both phases), FLOW.md (both phases), SystemPortabilityMap.md, CoverageMap.md
 5. **Compile verification** — walks through all phases in order to verify no forward references
 
-**Updates:** PhaseMap.md, StructureMap.md, GUIDE.md (x2), FLOW.md (x2), SystemPortabilityMap.md, SystemIsolationAnalysis.md, CoverageMap.md, GameStateSoFar.md.
+**Updates:** PhaseMap.md, StructureMap.md, GUIDE.md (×2), FLOW.md (×2), SystemPortabilityMap.md, SystemIsolationAnalysis.md, CoverageMap.md, GameStateSoFar.md.
 
 **Auto-chains:** None. Recommend `/decouple-check` afterward.
 
@@ -652,7 +708,7 @@ Updates each command file. Validates zero false positives.
 **Example situation:** After `/move-system` relocated two systems out of phase-D, it now only has 6 files. Phase-C next to it has 12 files and covers a related domain. You run `/merge-phase`, specify "absorb D into C", and it combines everything: scripts move into phase-C's structure, GameEvents merge, enums merge, tests merge, and all docs regenerate. Phase-D folder is deleted.
 
 **What it does:**
-1. **Validates** — checks adjacency (phases must be next to each other in dependency order), combined size cap (<=25 ideal, 26-30 acceptable), and dependency integrity
+1. **Validates** — checks adjacency (phases must be next to each other in dependency order), combined size cap (≤25 ideal, 26-30 acceptable), and dependency integrity
 2. **Merges** — combines all `_-Systems/` folders, GameEvents partial classes, enum files, LOG methods, tests, prototypes
 3. **Renumber option** — asks if subsequent phases should be renumbered (E→D, F→E, etc.)
 4. **Cross-reference scan** — finds all references to the absorbed phase across all docs and updates them
@@ -662,41 +718,6 @@ Updates each command file. Validates zero false positives.
 **Updates:** PhaseMap.md, StructureMap.md, GUIDE.md, FLOW.md, SystemPortabilityMap.md, SystemIsolationAnalysis.md, CoverageMap.md, Estimate.md, GameStateSoFar.md, NewAgent.md.
 
 **Auto-chains:** None. Recommend `/decouple-check` on merged phase afterward.
-
----
-
-### `/refresh-workspace-reg` — Rescan & Rebuild Registry
-
-**What is this?** Rescans ALL project folders in `MAIN-SOURCE/`, recounts `.cs` files, reclassifies scale/genre/skills demanded, and regenerates `WORKSPACE-REG.md`. Use when new projects are added or the registry feels stale.
-
-**Frequency:** After adding new projects to `MAIN-SOURCE/`. After skill list changes (new skills may match existing projects). Whenever the registry shows wrong counts or missing projects.
-
-**What it does:**
-1. Reads current `WORKSPACE-REG.md` (preserves manually-set Status values)
-2. Reads `CLAUDE.md` for the current skill list
-3. Scans every folder in `MAIN-SOURCE/` — counts `.cs` files, identifies genre, matches demand to available skills
-4. Rebuilds the full registry table with updated counts, scale classification, and skill tags
-5. Updates `CLAUDE.md` if project count changed
-
-**Auto-chains:** None.
-
----
-
-### `/project-overview` — Quick Project Analysis (Chat Only)
-
-**What is this?** A fast, in-depth overview of any project in `MAIN-SOURCE/`. Reads the source to determine genre, architecture style, file breakdown by category, estimated build hours, and key systems. Chat-only — creates no files.
-
-**Frequency:** Before running `/init` on a new project (to estimate scope). Anytime you want a quick read on what a game is.
-
-**What it outputs (chat only):**
-- Genre classification + player perspective
-- Asset breakdown (scripts, textures, audio, 3D models)
-- Architecture insights (main patterns, coupling issues, god objects)
-- System relationship overview
-- Estimated build hours by category (simple/medium/complex)
-- Recommended phase count and key risks
-
-**Auto-chains:** None.
 
 ---
 
@@ -734,7 +755,7 @@ PERIODIC MAINTENANCE (every few phases):
   /refresh-phase-docs             → after edits/fixes to any phase
   /refresh-learn-docs             → after multiple phases, major refactors
   /rebuild-templates              → after 3+ phases (backport proven patterns)
-  /rebuild-prompts                → after 3+ phases (audit commands against code)
+  /rebuild-prompts                → after 3+ phases (audit prompts against code)
   /audit-framework                → before adding new genre, after 2+ projects
   /implement-audit-todo           → after /audit-framework, when MAIN-SOURCE/ available
   /refresh-workspace-reg          → after new projects added or skills change
@@ -761,7 +782,7 @@ PERIODIC MAINTENANCE (every few phases):
 ```mermaid
 flowchart TD
     %% === BOOTSTRAP ===
-    SRC["MAIN-SOURCE/{project}/\n(raw decompiled .cs)"]
+    SRC["📁 MAIN-SOURCE/{project}/\n(raw decompiled .cs)"]
     EVAL["/project-overview\n(optional — estimate scope)"]
     INIT["/init\n→ ARCHITECTURE, PhaseMap,\nGOAL, NewAgent, Estimate,\nStructureMap, phase-All/"]
 
@@ -770,11 +791,11 @@ flowchart TD
     %% === PHASE LOOP ===
     INIT --> PHASE_START
 
-    subgraph PHASE_LOOP["Repeat for each phase (A → B → C → ...)"]
+    subgraph PHASE_LOOP["🔁 Repeat for each phase (A → B → C → ...)"]
         direction TB
         PHASE_START["/build-phase\n→ scripts + GUIDE + FLOW + tests"]
 
-        subgraph AUTO["Auto-chained (runs automatically)"]
+        subgraph AUTO["⚡ Auto-chained (runs automatically)"]
             direction LR
             AUDIT["/audit-phase\nsource fidelity"]
             DECOUPLE["/decouple-check\ncoupling scan"]
@@ -783,13 +804,13 @@ flowchart TD
 
         PHASE_START --> AUTO
 
-        ADHOC{{"Issues found?"}}
+        ADHOC{{"🔍 Issues found?"}}
         AUTO --> ADHOC
 
         FIX_LOOP["/source-fidelity-check\n/add-system-to-phase\n/move-system\n/refactor-interface"]
         ADHOC -- "Yes → fix" --> FIX_LOOP --> PHASE_START
 
-        HAND["Hand-type phase\ninto Unity"]
+        HAND["⌨️ Hand-type phase\ninto Unity"]
         ADHOC -- "No → clean" --> HAND
 
         CALIBRATE["/update-goal-from-handtyped\n→ style calibration"]
@@ -804,7 +825,7 @@ flowchart TD
     MORE -- "No" --> DONE
 
     %% === PERIODIC HOOKS ===
-    subgraph MAINT["Periodic (every 2-3 phases)"]
+    subgraph MAINT["🔧 Periodic (every 2-3 phases)"]
         direction LR
         M1["/evolve-shared-infra"]
         M2["/refresh-phase-docs"]
@@ -817,10 +838,10 @@ flowchart TD
     MAINT -.-> PHASE_START
 
     %% === COMPLETE ===
-    DONE["All phases complete\nGame rebuilt"]
+    DONE["✅ All phases complete\nGame rebuilt"]
 
     %% === FRAMEWORK LEVEL ===
-    subgraph FW["Framework Maintenance (cross-project)"]
+    subgraph FW["🏗️ Framework Maintenance (cross-project)"]
         direction LR
         FW1["/audit-framework\n→ gap report"]
         FW2["/implement-audit-todo\n→ new skills, templates"]
@@ -835,25 +856,25 @@ flowchart TD
 
 ## Key Facts
 
-- **In-depth analysis is MANDATORY** — `CLAUDE.md` enforces thorough analysis before every response. This applies to ALL chats and ALL commands without exception.
+- **In-depth analysis is MANDATORY** — `project-guidelines.md` enforces thorough analysis before every response. This applies to ALL Windsurf chats and ALL prompt commands without exception.
 - **Source at `MAIN-SOURCE/{project}/`** — raw decompiled/extracted source. READ-ONLY. Never modify.
 - **Output at `LEARN/{project}/`** — all generated docs, phase folders, shared scripts.
-- **Only files in `.windsurf/workflows/` become slash commands** — everything else is regular files.
-- **`CLAUDE.md` is always loaded** — architecture conventions every response already knows.
+- **Only files in `.windsurf/workflows/` become workflows** — everything else in `.windsurf/` is regular files.
+- **`.windsurf/project-guidelines.md` is always loaded** — architecture conventions summary every Windsurf response already knows.
 - **`.windsurf/templates/` holds universal templates** — copied + customized per project by `/init`.
-- **Commands are `.md` files on disk** — edit anytime, changes take effect on next invocation.
-- **Each command is standalone** — `/decouple-check` works independently without `/build-phase`.
+- **Prompts are `.md` files on disk** — edit anytime, changes take effect on next invocation.
+- **Each prompt is standalone** — `/decouple-check` works independently without `/build-phase`.
 - **`/build-phase` chains 3 others** — auto-runs audit, decouple, and cross-phase at the end.
 - **`/update-goal-from-handtyped` should run after EVERY phase** — your style evolves.
 - **`/rebuild-templates` and `/rebuild-prompts` ask before modifying** — show gap report first.
 - **`/audit-framework` is the multi-project meta-audit** — scans ALL projects to find framework gaps across genres. Also asks before modifying.
-- **`/implement-audit-todo` is the framework builder** — reads `MAIN-SOURCE/` and implements gap report items (new skills, genre variants, convention/template/command edits). Companion to `/audit-framework`.
+- **`/implement-audit-todo` is the framework builder** — reads `MAIN-SOURCE/` and implements gap report items (new skills, genre variants, convention/template/prompt edits). Companion to `/audit-framework`.
 - **Phase size cap = ~25 files** — enforced by `/init` and `/add-system-to-phase`.
 - **80% rule** — at least 80% of scripts in any phase (excluding phase-All) MUST live inside `_-Systems/`. Enforced by `/build-phase`, `/audit-phase`, and `/decouple-check`.
 - **GameEvents signatures use interfaces only** — never concrete classes. Zero imports from `_-Systems/`.
 - **AnimParamType enum** — no raw strings for Animator parameters. Enforced by `/build-phase` and `/audit-phase`.
 - **`handTyped(latest)/` is optional** — if it doesn't exist, agents use completed phase code + GOAL.md as style reference.
-- **The learn folder can be `learn/` (legacy) or `LEARN/{PROJECT}/` (future convention)** — commands ask for the path.
-- **Skills load when referenced** — `.windsurf/skills/*/SKILL.md` files are referenced by commands when the task matches their description. You never invoke them manually.
+- **The learn folder can be `learn/` (legacy) or `LEARN/{PROJECT}/` (future convention)** — prompts ask for the path.
+- **Skills auto-load** — `.windsurf/skills/*/SKILL.md` files load automatically when the task matches their description. You never invoke them manually.
 - **Skills are universal** — written for ANY Unity project, not just one game. Concrete examples use MINEMGL classes as reference.
-- **18 skills currently exist** — all universal, loaded by commands when relevant.
+- **18 skills currently exist** — unity-testing, unity-scene-setup, unity-audio, unity-animation, unity-prefab-hierarchy, unity-save-load, unity-fsm, unity-day-night, unity-ai-navigation, unity-networking, unity-quest, unity-procedural-gen, unity-camera, unity-dialogue, unity-input, unity-physics, unity-inventory, unity-grid-building.

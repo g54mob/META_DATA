@@ -80,16 +80,25 @@ No user input required — this prompt scans the entire workspace.
    - All phases from PhaseMap.md complete → `Complete`
    - Preserve existing status if LEARN folder matches (don't downgrade)
 
-## Phase 6 — Rebuild Demand Matrix
+## Phase 6 — Build Genre Clusters
 
-10. After all projects classified, rebuild the Skill Demand table:
+10. Group projects by primary genre into clusters:
+    a. For each distinct genre, list all projects that belong to it
+    b. A project may appear in multiple clusters if it has strong dual-genre identity (e.g., Horror + Co-op)
+    c. Sort clusters by count (highest first), then alphabetical for ties
+    d. Use short genre labels: "Horror", "Tycoon / Management", "Idle / Incremental", "Factory / Automation", "Physics Sandbox / Sim", "Colony Sim / Strategy", "Card / Strategy", "City / Building Sim", "Action / Combat", "Tower Defense", "Engineering Puzzle", "Mystery / Puzzle", "Narrative / Adventure", "Casual / Puzzle", etc.
+    e. Merge genres with only 1 project into a broader category where sensible — avoid single-project clusters unless the genre is truly unique
+
+## Phase 7 — Rebuild Demand Matrix
+
+11. After all projects classified, rebuild the Skill Demand table:
     a. For each skill, count how many projects list it
     b. List all project short-names that need it
     c. Sort by demand count (highest first), then alphabetical for ties
 
-## Phase 7 — Write WORKSPACE-REG.md
+## Phase 8 — Write WORKSPACE-REG.md
 
-11. Write `.github/WORKSPACE-REG.md` with this exact structure:
+12. Write `.github/WORKSPACE-REG.md` with this exact structure:
 
 ```markdown
 # Project Registry
@@ -98,6 +107,8 @@ No user input required — this prompt scans the entire workspace.
 > For detailed research, analysis, or /init work — always read `MAIN-SOURCE/{project}/` directly.
 >
 > Updated by `/refresh-workspace-reg`, `/audit-framework`, and `/implement-audit-todo`.
+>
+> **Universal skills** (`unity-input`, `unity-scene-setup`, `unity-testing`, `unity-prefab-hierarchy`) apply to ALL projects and are omitted from the table below.
 
 ---
 
@@ -123,6 +134,17 @@ No user input required — this prompt scans the entire workspace.
 
 ---
 
+## Genre Clusters
+
+| Genre | Count | Projects |
+|-------|-------|----------|
+| {genre_label} | {count} | {project list} |
+...
+
+> **Note:** Some projects appear in multiple clusters (e.g., Horror + Co-op). Clusters reflect primary genre identity for at-a-glance lookup.
+
+---
+
 ## Skill Demand (projects needing each skill)
 
 | Skill | Demand | Projects |
@@ -135,22 +157,25 @@ No user input required — this prompt scans the entire workspace.
 ## Notes
 
 - `.cs counts` are exact file counts from MAIN-SOURCE/ scan on {DATE}
-- Genre: confirmed (from LEARN/ docs) or estimated (from folder patterns)
-- Skill applicability: confirmed (from /init) or estimated (from file signals)
+- Genre: confirmed (from LEARN/ docs) or estimated (from folder patterns) — marked where estimated
+- Skill applicability: confirmed (from /init) or estimated (from file signals) — all projects currently at "Not started" status
 - Status tracks rebuild progress: `Not started` → `Init'd` → `Phase X in progress` → `Complete`
+- Universal skills (input, scene-setup, testing, prefab-hierarchy) omitted from per-project column for readability
+- Project names reflect actual folder names in MAIN-SOURCE/ (case-sensitive)
 ```
 
 ## Validation
 
-12. Verify:
+13. Verify:
     - Every project folder in MAIN-SOURCE/ appears in the table (no orphans)
     - No table entry references a project folder that doesn't exist
     - Scale tier matches actual .cs count for every row
+    - Genre Clusters table includes every project at least once
     - Skill Demand counts match the sum of projects listing that skill
     - Scale Distribution counts sum to total project count
     - Universal skills (input, scene-setup, testing, prefab-hierarchy) show demand = total project count
 
 ## Post-Refresh
 
-13. Update `.github/copilot-instructions.md` if project count changed (currently references "29 projects" in workspace description — update if different)
-14. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
+14. Update `.github/copilot-instructions.md` if project count changed (currently references "29 projects" in workspace description — update if different)
+15. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
