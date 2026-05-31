@@ -23,6 +23,30 @@ No user input required — this prompt scans the entire workspace.
    b. Record the exact count — do NOT approximate
    c. If a project has only an `Assemblies/` folder (DLLs, no raw .cs): note as "DLL-only" and estimate from DLL count × ~50
 
+## Phase 1.5 — Measure Content Volume
+
+6. For EACH project folder in `MAIN-SOURCE/`:
+
+   **A. Word count (code volume):**
+   - Count total words across all `.cs` files combined (`cat *.cs | wc -w` equivalent)
+   - Record as raw number (e.g., 52561, 1.12M)
+   - This is the TRUE complexity metric — more important than file count
+
+   **B. Script class breakdown:**
+   - Count classes inheriting `MonoBehaviour` (grep for `: MonoBehaviour` or `: NetworkBehaviour` or `: MonoBehaviourPun` etc.)
+   - Count classes inheriting `NetworkBehaviour` / `MonoBehaviourPun` / `MonoBehaviourPunCallbacks` (subset of above — multiplayer scripts)
+   - Count classes inheriting `ScriptableObject` (grep for `: ScriptableObject`)
+   - Count `interface` declarations (grep for `interface I` or `public interface` or `internal interface`)
+   - Count remaining classes as "Other" (plain C# classes, structs, enums — anything not MB/SO/interface)
+
+   **C. Asset counts (from project folder or .stub file):**
+   - Count `.png` + `.jpg` + `.psd` + `.tga` files = **Sprites/Textures**
+   - Count `.fbx` + `.obj` + `.blend` files = **3D Models**
+   - Count `.anim` files = **Animation Clips**
+   - Count `.controller` files = **Animator Controllers**
+   - If raw asset folders don't exist, check `entire-{project}.stub` for file hierarchy listings and count from there
+   - If neither source has asset info, mark as "N/A (no asset data)"
+
 ## Phase 2 — Classify Scale
 
 6. Apply scale tiers from actual .cs count:
@@ -114,9 +138,27 @@ No user input required — this prompt scans the entire workspace.
 
 ## Projects
 
-| Project | .cs Count | Scale | Genre(s) | Status | Applicable Skills |
-|---------|-----------|-------|-----------|--------|-------------------|
-| `{name}` | {exact_count} | {scale} | {genre} | {status} | {skills csv} |
+| Project | .cs Count | Words | Scale | Genre(s) | Status | Applicable Skills |
+|---------|-----------|-------|-------|-----------|--------|-------------------|
+| `{name}` | {exact_count} | {word_count} | {scale} | {genre} | {status} | {skills csv} |
+...
+
+---
+
+## Content Volume
+
+| Project | Words | MonoBehaviours | NetworkBehaviours | ScriptableObjects | Interfaces | Other Classes |
+|---------|-------|----------------|-------------------|-------------------|------------|---------------|
+| `{name}` | {word_count} | {mb_count} | {nb_count} | {so_count} | {iface_count} | {other_count} |
+...
+
+---
+
+## Asset Counts
+
+| Project | Sprites/Textures | 3D Models (.fbx/.obj/.blend) | Anim Clips (.anim) | Animator Controllers (.controller) |
+|---------|------------------|------------------------------|---------------------|-------------------------------------|
+| `{name}` | {sprite_count} | {model_count} | {anim_count} | {controller_count} |
 ...
 
 ---
@@ -157,8 +199,15 @@ No user input required — this prompt scans the entire workspace.
 ## Notes
 
 - `.cs counts` are exact file counts from MAIN-SOURCE/ scan on {DATE}
+- `Words` = total word count across all .cs files (true complexity measure — more reliable than file count)
+- `MonoBehaviours` includes all MB-derived classes (MonoBehaviour, NetworkBehaviour subtypes counted separately)
+- `NetworkBehaviours` = subset of MonoBehaviours that inherit NetworkBehaviour/MonoBehaviourPun/MonoBehaviourPunCallbacks
+- `ScriptableObjects` = classes inheriting ScriptableObject (data containers)
+- `Interfaces` = all interface declarations
+- `Other Classes` = plain classes, structs, enums not in above categories
+- Asset counts sourced from project folders or `.stub` file hierarchy; "N/A" if no asset data available
 - Genre: confirmed (from LEARN/ docs) or estimated (from folder patterns) — marked where estimated
-- Skill applicability: confirmed (from /init) or estimated (from file signals) — all projects currently at "Not started" status
+- Skill applicability: confirmed (from /init) or estimated (from file signals)
 - Status tracks rebuild progress: `Not started` → `Init'd` → `Phase X in progress` → `Complete`
 - Universal skills (input, scene-setup, testing, prefab-hierarchy) omitted from per-project column for readability
 - Project names reflect actual folder names in MAIN-SOURCE/ (case-sensitive)
@@ -174,6 +223,9 @@ No user input required — this prompt scans the entire workspace.
     - Skill Demand counts match the sum of projects listing that skill
     - Scale Distribution counts sum to total project count
     - Universal skills (input, scene-setup, testing, prefab-hierarchy) show demand = total project count
+    - Content Volume table has an entry for every project (word count must be non-zero for any project with .cs files)
+    - MonoBehaviours + ScriptableObjects + Interfaces + Other ≈ total class/type declarations (sanity check)
+    - Asset Counts table has an entry for every project (use "N/A" where data unavailable, never leave blank)
 
 ## Post-Refresh
 
