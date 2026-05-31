@@ -13,42 +13,49 @@ No user input required — this prompt scans the entire workspace.
 1. Read `.windsurf/WORKSPACE-REG.md` — current registry (preserve any manually-set Status values)
 2. Read `.windsurf/copilot-instructions.md` — current skill list (Skills table) for valid skill names
 3. List `MAIN-SOURCE/` — get every project folder (ignore `.stub` files, `file-size.js`, `pathHierarchy.js`, `gitignore-gen.js`)
-4. For each project folder, list its contents to determine structure (Scripts/, Assemblies/, etc.)
+4. **Immediately count** the project folder list and record as `TOTAL_PROJECTS`. Verify with `| wc -l`. This number must match all table row counts later.
+5. For each project folder, list its top-level contents to determine structure (Scripts/, Assemblies/, etc.)
 
 ## Phase 1 — Count .cs Files Per Project
 
-5. For EACH project folder in `MAIN-SOURCE/`:
-   a. Recursively count all `.cs` files (search `**/*.cs` within that folder)
+6. For EACH project folder in `MAIN-SOURCE/`:
+   a. Recursively count all `.cs` files (use `find "$dir" -name "*.cs" | wc -l`)
    b. Record the exact count — do NOT approximate
    c. If a project has only an `Assemblies/` folder (DLLs, no raw .cs): note as "DLL-only" and estimate from DLL count × ~50
 
-## Phase 1.5 — Measure Content Volume
+**Batching:** Process in batches of ~10 projects per shell command to avoid timeouts. Use a for-loop that prints `"$dir: $count"` per project. Run batches in parallel where possible.
 
-6. For EACH project folder in `MAIN-SOURCE/`:
+## Phase 2 — Measure Content Volume
+
+7. For EACH project folder in `MAIN-SOURCE/`:
 
    **A. Word count (code volume):**
-   - Count total words across all `.cs` files combined (`cat *.cs | wc -w` equivalent)
-   - Record as raw number (e.g., 52561, 1.12M)
+   - Count total words across all `.cs` files combined: `find "$dir" -name "*.cs" -exec cat {} + | wc -w`
+   - Record as raw number (e.g., 52561, 1124520)
    - This is the TRUE complexity metric — more important than file count
+   - **Batch** in groups of ~10 projects per command. Use 300s timeout for word-count commands.
 
    **B. Script class breakdown:**
-   - Count classes inheriting `MonoBehaviour` (grep for `: MonoBehaviour` or `: NetworkBehaviour` or `: MonoBehaviourPun` etc.)
-   - Count classes inheriting `NetworkBehaviour` / `MonoBehaviourPun` / `MonoBehaviourPunCallbacks` (subset of above — multiplayer scripts)
-   - Count classes inheriting `ScriptableObject` (grep for `: ScriptableObject`)
-   - Count `interface` declarations (grep for `interface I` or `public interface` or `internal interface`)
-   - Count remaining classes as "Other" (plain C# classes, structs, enums — anything not MB/SO/interface)
+   - Use `grep -rl` (files containing pattern) within each project to count:
+     - **MonoBehaviours:** files matching `: MonoBehaviour` OR `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks`
+     - **NetworkBehaviours:** files matching `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks` (subset of MB count)
+     - **ScriptableObjects:** files matching `: ScriptableObject`
+     - **Interfaces:** files containing `interface ` declarations (grep for `"^\s*\(public \|internal \|private \|\)interface "`)
+     - **Other Classes:** calculated as `(.cs file count) - (MonoBehaviours + ScriptableObjects + Interfaces)`. This is an approximation since some files contain multiple types or only enums/structs, but sufficient for registry purposes.
+   - **Batch** in groups of ~10 projects per command.
 
-   **C. Asset counts (from project folder or .stub file):**
-   - Count `.png` + `.jpg` + `.psd` + `.tga` files = **Sprites/Textures**
-   - Count `.fbx` + `.obj` + `.blend` files = **3D Models**
-   - Count `.anim` files = **Animation Clips**
-   - Count `.controller` files = **Animator Controllers**
-   - If raw asset folders don't exist, check `entire-{project}.stub` for file hierarchy listings and count from there
-   - If neither source has asset info, mark as "N/A (no asset data)"
+   **C. Asset counts (from .stub files or project folders):**
+   - For sprites/textures: `grep -ci "\.png\|\.jpg\|\.psd\|\.tga" "entire-{project}.stub"`
+     - NOTE: This counts lines containing these extensions — includes `.meta` references. Accept as approximate.
+   - For 3D models: count actual files in project folder with `find "$dir" -name "*.fbx" -o -name "*.obj" -o -name "*.blend" | wc -l`
+   - For animation clips: count actual files with `find "$dir" -name "*.anim" | wc -l`
+   - For animator controllers: count actual files with `find "$dir" -name "*.controller" | wc -l`
+   - If neither project folder nor stub has data, mark as "N/A"
+   - **Prefer actual file counts** from project folders over stub grep when both exist. Fall back to stub only for sprites (which are typically stripped from source folders but listed in stubs).
 
-## Phase 2 — Classify Scale
+## Phase 3 — Classify Scale
 
-6. Apply scale tiers from actual .cs count:
+8. Apply scale tiers from actual .cs count:
    | Scale | Range |
    |-------|-------|
    | Micro | < 50 |
@@ -58,70 +65,70 @@ No user input required — this prompt scans the entire workspace.
    | XLarge | 800–1999 |
    | Massive | 2000+ |
 
-## Phase 3 — Classify Genre
+   After classifying, **verify:** sum of all tier counts MUST equal `TOTAL_PROJECTS`.
 
-7. For each project, determine genre(s) from:
-   - Folder names in Scripts/ (e.g., `Combat/`, `Building/`, `Dialogue/`, `AI/`, `Inventory/`)
-   - Class name patterns (e.g., `*Tycoon*`, `*Horror*`, `*Tower*`, `*Card*`)
-   - If project has `LEARN/{project}/ARCHITECTURE.md` or `GOAL.md`, read genre from there (authoritative)
-   - If `/init` has already run (LEARN/{project}/ exists with docs), use that classification as ground truth
-   - Otherwise classify from folder/file patterns (mark as "estimated" in Notes)
+## Phase 4 — Classify Genre
 
-## Phase 4 — Determine Applicable Skills
+9. For each project, determine genre(s) from:
+   - **Primary source:** If `LEARN/{project}/ARCHITECTURE.md` or `GOAL.md` exists, read genre from there (authoritative)
+   - **Secondary source:** Explore `Scripts/Assembly-CSharp/` subfolders — these contain the actual game code organized by domain (e.g., `Combat/`, `Building/`, `Cartel/`, `FactoryFloor/`, `Battle/`)
+   - **Tertiary source:** Search for genre-signal filenames: `find "$dir" -name "*.cs" | grep -i "keyword"` with keywords like farm, tower, idle, horror, card, physics, build, craft, quest, vehicle, etc.
+   - **Last resort:** Class name patterns from file listings (e.g., `*Tycoon*`, `*Horror*`, `*Tower*`, `*Card*`)
 
-8. For each project, determine which skills apply by scanning for evidence:
-   | Signal | Skill |
-   |--------|-------|
-   | NavMesh*, AI*, Patrol*, NPC* folders/classes | `unity-ai-navigation` |
-   | Anim*, Animator*, Spine*, DOTween refs | `unity-animation` |
-   | Audio*, Sound*, Music*, FMOD* | `unity-audio` |
-   | Camera*, Cinemachine*, FreeLook* | `unity-camera` |
-   | DayNight*, TimeOfDay*, Sun*, LightCycle* | `unity-day-night` |
-   | Dialogue*, Yarn*, Ink*, Conversation* | `unity-dialogue` |
-   | State*, FSM*, IState* | `unity-fsm` |
-   | Grid*, Build*, Place*, Tile*, Snap* | `unity-grid-building` |
-   | Input*, Rebind*, ActionMap* | `unity-input` |
-   | Inventory*, Item*, Slot*, Hotbar*, Equipment* | `unity-inventory` |
-   | Network*, RPC*, Sync*, Photon*, Mirror*, FishNet* | `unity-networking` |
-   | Rigidbody*, Joint*, Ragdoll*, Physics*, Force* | `unity-physics` |
-   | Prefab hierarchy evidence (universal) | `unity-prefab-hierarchy` |
-   | Procedural*, Perlin*, Chunk*, WorldGen*, Seed* | `unity-procedural-gen` |
-   | Quest*, Objective*, Journal* | `unity-quest` |
-   | Save*, Load*, ISaveable*, Persist*, Slot* (save context) | `unity-save-load` |
-   | Scene setup (universal) | `unity-scene-setup` |
-   | Testing (universal) | `unity-testing` |
+   Genre classification order of trust: LEARN/ docs > subfolder structure > filename patterns > class name guesses
 
-   - `unity-input`, `unity-scene-setup`, `unity-testing`, `unity-prefab-hierarchy` apply to ALL projects
-   - For non-universal skills, require at least 2 signal matches OR 1 strong match (dedicated folder)
+## Phase 5 — Determine Applicable Skills
 
-## Phase 5 — Determine Status
+10. For each project, determine which skills apply by scanning for evidence:
+    | Signal | Skill |
+    |--------|-------|
+    | NavMesh*, AI*, Patrol*, NPC* folders/classes; AstarPathfindingProject assembly | `unity-ai-navigation` |
+    | Anim*, Animator*, Spine*, DOTween assembly; animation-heavy folders | `unity-animation` |
+    | Audio*, Sound*, Music*, FMOD* assembly; AudioManager class | `unity-audio` |
+    | Camera*, Cinemachine assembly*, FreeLook* | `unity-camera` |
+    | DayNight*, TimeOfDay*, Sun*, LightCycle*, DayNightFader | `unity-day-night` |
+    | Dialogue*, Yarn*, Ink*, Conversation*; YarnSpinner/PixelCrushers assembly | `unity-dialogue` |
+    | State*, FSM*, IState*; Animancer.FSM assembly | `unity-fsm` |
+    | Grid*, Build*, Place*, Tile*, Snap*; building/placement folders | `unity-grid-building` |
+    | Inventory*, Item*, Slot*, Hotbar*, Equipment* (in inventory context) | `unity-inventory` |
+    | Photon*, Mirror*, FishNet*, Netcode*; NetworkBehaviour count > 0 | `unity-networking` |
+    | Rigidbody*, Joint*, Ragdoll*, Physics*, Force*; ActiveRagdoll folder | `unity-physics` |
+    | Procedural*, Perlin*, Chunk*, WorldGen*, Seed*; DunGen assembly | `unity-procedural-gen` |
+    | Quest*, Objective*, Journal* | `unity-quest` |
+    | Save*, Load*, ISaveable*, Persist*; EasySave assembly; SaveManager class | `unity-save-load` |
 
-9. For each project, check `LEARN/{project}/` existence:
-   - No LEARN folder → `Not started`
-   - Has ARCHITECTURE.md/GOAL.md but no phase folders → `Init'd`
-   - Has phase-{x} folders → count them → `Phase {highest} in progress`
-   - All phases from PhaseMap.md complete → `Complete`
-   - Preserve existing status if LEARN folder matches (don't downgrade)
+    - `unity-input`, `unity-scene-setup`, `unity-testing`, `unity-prefab-hierarchy` apply to ALL projects (universal — omit from per-project column)
+    - For non-universal skills, require at least 2 signal matches OR 1 strong match (dedicated folder OR dedicated assembly)
 
-## Phase 6 — Build Genre Clusters
+## Phase 6 — Determine Status
 
-10. Group projects by primary genre into clusters:
+11. For each project, check `LEARN/{project}/` existence:
+    - No LEARN folder → `Not started`
+    - Has ARCHITECTURE.md/GOAL.md but no `phase-{letter/number}` folders → `Init'd`
+    - Has `phase-{x}` folders → count them → `Phase {highest} in progress`
+    - All phases from PhaseMap.md complete → `Complete`
+    - Preserve existing manually-set status if LEARN folder state hasn't changed (don't downgrade)
+
+## Phase 7 — Build Genre Clusters
+
+12. Group projects by primary genre into clusters:
     a. For each distinct genre, list all projects that belong to it
     b. A project may appear in multiple clusters if it has strong dual-genre identity (e.g., Horror + Co-op)
     c. Sort clusters by count (highest first), then alphabetical for ties
-    d. Use short genre labels: "Horror", "Tycoon / Management", "Idle / Incremental", "Factory / Automation", "Physics Sandbox / Sim", "Colony Sim / Strategy", "Card / Strategy", "City / Building Sim", "Action / Combat", "Tower Defense", "Engineering Puzzle", "Mystery / Puzzle", "Narrative / Adventure", "Casual / Puzzle", etc.
+    d. Use short genre labels: "Horror", "Tycoon / Management", "Idle / Incremental", "Factory / Automation", "Physics Sandbox / Combat", "Colony Sim / Strategy", "Card / Strategy", "City / Building Sim", "Action / RPG", "Tower Defense", "Engineering Puzzle", "Narrative / Mystery", "Co-op Multiplayer", etc.
     e. Merge genres with only 1 project into a broader category where sensible — avoid single-project clusters unless the genre is truly unique
 
-## Phase 7 — Rebuild Demand Matrix
+## Phase 8 — Rebuild Demand Matrix
 
-11. After all projects classified, rebuild the Skill Demand table:
-    a. For each skill, count how many projects list it
+13. After all projects classified, rebuild the Skill Demand table:
+    a. For each non-universal skill, count how many projects list it **by re-reading the completed Projects table rows**
     b. List all project short-names that need it
     c. Sort by demand count (highest first), then alphabetical for ties
+    d. **Cross-check:** the listed project names for each skill must exactly match the projects that have that skill in their Applicable Skills column. If there's a mismatch, fix the discrepancy before writing.
 
-## Phase 8 — Write WORKSPACE-REG.md
+## Phase 9 — Write WORKSPACE-REG.md
 
-12. Write `.windsurf/WORKSPACE-REG.md` with this exact structure:
+14. Write `.windsurf/WORKSPACE-REG.md` with this exact structure:
 
 ```markdown
 # Project Registry
@@ -203,30 +210,32 @@ No user input required — this prompt scans the entire workspace.
 - `NetworkBehaviours` = subset of MonoBehaviours that inherit NetworkBehaviour/MonoBehaviourPun/MonoBehaviourPunCallbacks
 - `ScriptableObjects` = classes inheriting ScriptableObject (data containers)
 - `Interfaces` = all interface declarations
-- `Other Classes` = plain classes, structs, enums not in above categories
-- Asset counts sourced from project folders or `.stub` file hierarchy; "N/A" if no asset data available
+- `Other Classes` = approximate: total .cs files minus (MB + SO + Interface file counts)
+- Asset counts: Sprites from `.stub` file grep (approximate — includes .meta refs); Models/Anims/Controllers from actual file counts
 - Genre: confirmed (from LEARN/ docs) or estimated (from folder patterns) — marked where estimated
 - Skill applicability: confirmed (from /init) or estimated (from file signals)
 - Status tracks rebuild progress: `Not started` → `Init'd` → `Phase X in progress` → `Complete`
 - Universal skills (input, scene-setup, testing, prefab-hierarchy) omitted from per-project column for readability
 - Project names reflect actual folder names in MAIN-SOURCE/ (case-sensitive)
+- Total workspace: {TOTAL_PROJECTS} projects, ~{total .cs files} .cs files, ~{total words}M words of source code
 ```
 
 ## Validation
 
-13. Verify:
-    - Every project folder in MAIN-SOURCE/ appears in the table (no orphans)
+15. Verify ALL of the following before considering the task complete:
+    - `TOTAL_PROJECTS` matches the actual `ls | wc -l` count from step 4
+    - Every project folder in MAIN-SOURCE/ appears in the Projects table (no orphans)
     - No table entry references a project folder that doesn't exist
-    - Scale tier matches actual .cs count for every row
+    - Scale tier label matches actual .cs count for every row (re-check each)
+    - Scale Distribution project counts sum to `TOTAL_PROJECTS`
     - Genre Clusters table includes every project at least once
-    - Skill Demand counts match the sum of projects listing that skill
-    - Scale Distribution counts sum to total project count
-    - Universal skills (input, scene-setup, testing, prefab-hierarchy) show demand = total project count
-    - Content Volume table has an entry for every project (word count must be non-zero for any project with .cs files)
-    - MonoBehaviours + ScriptableObjects + Interfaces + Other ≈ total class/type declarations (sanity check)
-    - Asset Counts table has an entry for every project (use "N/A" where data unavailable, never leave blank)
+    - Skill Demand counts match the actual count of projects listing that skill in their Applicable Skills column
+    - Universal skills show demand = `TOTAL_PROJECTS`
+    - Content Volume table has an entry for every project
+    - Asset Counts table has an entry for every project (use "0" for none, "N/A" only when data truly unavailable)
+    - No duplicate project entries in any table
 
 ## Post-Refresh
 
-14. Update `.windsurf/copilot-instructions.md` if project count changed (currently references "29 projects" in workspace description — update if different)
-15. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
+16. Update `.windsurf/copilot-instructions.md` if project count changed (update workspace description if different)
+17. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
