@@ -108,14 +108,19 @@ The orchestration follows a strict dependency DAG:
    Skip workflow. Main agent reads all files directly (fits in 200k). Jump to Phase 3 step 9.
 
    **PATH B or C — Use Workflow:**
-   Build the args object and invoke the workflow:
+   Build the args object and invoke the workflow.
+
+   **HOW TO BUILD THE FILE LIST:**
+   1. Use the **Glob tool** with pattern `**/*.cs` in the game code folder — it returns all paths directly into your context.
+   2. The Glob result IS the file list. Pass it directly as the `files` array.
+   3. **FORBIDDEN:** Do NOT use `find`, `bash`, `node`, `python`, temp files, or ANY shell command to build the file list. The Glob tool does this natively and correctly.
 
    ```
    Workflow({
      scriptPath: ".claude/workflows/init-phase2-scan.js",
      args: {
        project: "{PROJECT}",
-       files: [array of ALL .cs absolute file paths from Glob — SORTED BY FOLDER PATH],
+       files: ["U:/IMPL/IMPL/MAIN-SOURCE/{PROJECT}/Scripts/Assembly-CSharp/File1.cs", "File2.cs", ...],
        totalWords: estimated_total_words,
        scale: "Medium" | "Large" | "XLarge" | "Massive" | "Colossal" | "Titan",
        scanPath: "B" | "C",
@@ -123,6 +128,8 @@ The orchestration follows a strict dependency DAG:
      }
    })
    ```
+
+   The Glob tool already returns paths sorted. For large projects (2000+ files), the array will be large — that's expected and supported. The Workflow tool accepts large args values natively.
 
 ### What the workflow does internally:
 

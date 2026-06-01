@@ -222,7 +222,9 @@ This command uses **parallel subagents** to analyze source code faster and with 
    architecture depends on your completeness.
    ```
 
-   **CRITICAL:** Each agent MUST be given the exact file paths to read (absolute paths). The main agent builds the path list from the Glob results.
+   **CRITICAL:** Each agent MUST be given the exact file paths to read (absolute paths). Use the **Glob tool** to get all paths — it returns them directly into your context. Then embed them inline in each agent's prompt string.
+
+   **FORBIDDEN:** Do NOT use `find`, `bash`, `node`, `python`, temp files, or ANY shell command to build file lists. The Glob tool does this natively. Pass paths directly from Glob results into agent prompts.
 
 8-DEEP-WAIT. **Wait for all scan agents to complete.** Collect all results. (Applies to both PATH B and PATH C deep scan.)
 
