@@ -1,4 +1,23 @@
-.vscode/
-LEARN/
-MAIN-SOURCE/
-ad.txt
+# Exclude everything
+*
+
+# Include config folders
+!.claude/
+!.claude/**
+!.github/
+!.github/**
+!.windsurf/
+!.windsurf/**
+
+# Include root files
+!.gitignore
+!CLAUDE.md
+!pack.js
+
+# Include folders as empty (content ignored, .gitkeep tracked)
+!LEARN/
+LEARN/**
+!LEARN/.gitkeep
+!MAIN-SOURCE/
+MAIN-SOURCE/**
+!MAIN-SOURCE/.gitkeep
