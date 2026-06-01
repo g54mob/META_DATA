@@ -140,12 +140,16 @@ The orchestration follows a strict dependency DAG:
 
 ```json
 {
-  "scanResults": ["agent1 report text", "agent2 report text", ...],
-  "surfaceMetadata": "merged catalog for skipped files (PATH C only, empty string for PATH B)",
+  "scanDir": "LEARN/{PROJECT}/_scan",
+  "deepScanFiles": ["LEARN/{PROJECT}/_scan/deep-1.md", "deep-2.md", ...],
+  "surfaceScanFiles": ["LEARN/{PROJECT}/_scan/surface-1.md", ...],
+  "surfaceMergedFile": "LEARN/{PROJECT}/_scan/surface-merged.md (PATH C only, null for PATH B)",
   "filterStats": { "totalFiles": N, "deepScanCount": N, "skippedCount": N, "filterReduction": "X%" },
   "agentStats": { "surfaceAgents": N, "deepAgents": N, "totalAgents": N }
 }
 ```
+
+**KEY: File-based handoff.** Scan results are written to `LEARN/{PROJECT}/_scan/` on disk — NOT returned as in-memory text. This keeps the orchestrator context lean (~5% usage instead of 99%). Phase 3 agents read from these files directly.
 
 ### Determinism guarantees (vs /init):
 
@@ -159,20 +163,26 @@ The orchestration follows a strict dependency DAG:
 
 ### Error handling:
 
-- If workflow returns partial results (`scanResults` has nulls), inspect `agentStats` to identify failed chunks. Fall back to manually reading those chunks.
+- If workflow returns partial results (fewer `deepScanFiles` than expected), check which `_scan/deep-N.md` files exist on disk. For missing ones, fall back to manually reading those file chunks.
 - If workflow fails entirely, fall back to `/init` Phase 2 behavior (manual agent spawning).
 
 **Wait for workflow to complete before proceeding.**
 
 ---
 
-## PHASE 3 — Synthesis (Main Agent, Sequential)
+## PHASE 3 — Synthesis (Background Agents, Disk-Based)
 
-The main agent now has all scan results from Phase 2 (deep scan results + surface metadata for skipped files if Two-Tier). This is the critical synthesis step — it CANNOT be parallelized because each doc depends on the previous.
+Scan results are on disk at `LEARN/{PROJECT}/_scan/`. The main loop stays lean — it spawns background agents that read from disk and write docs to disk. The main loop only tracks: file paths, agent status, and metadata (agentStats, filterStats).
+
+**Context budget rule:** After Phase 2 completes, the main loop should be under 30% context. If you find yourself reading scan file contents into your own context, STOP — spawn an agent to do it instead.
 
 ### Merge & Analyze
 
-9. **Merge all agent reports** into a unified picture:
+9. **Spawn a background agent** to synthesize ARCHITECTURE.md from the scan files on disk. This keeps the main loop's context lean.
+
+   The agent should:
+   - Read ALL files in `LEARN/{PROJECT}/_scan/deep-*.md` (the scan results written by Phase 2)
+   - If Two-Tier (PATH C): also read `LEARN/{PROJECT}/_scan/surface-merged.md` for lightweight entries
    - Combine all DEPENDENCY EDGES tables → full dependency graph
    - Combine all SINGLETONS FOUND → execution order candidates
    - Combine all INTERFACES FOUND → interface catalog
@@ -181,7 +191,9 @@ The main agent now has all scan results from Phase 2 (deep scan results + surfac
    - Combine all THIRD-PARTY USAGE → third-party dependency list
    - Combine all COLLECTIONS FOR DATASERVICE → DataService extraction candidates
    - Count total files analyzed. Cross-check against Glob count from step 6.
-   - **If Two-Tier (PATH C):** Also merge surface metadata for files that were NOT deep-scanned. These files appear in ARCHITECTURE.md as lightweight entries (class name, type, base class, line count, interfaces) rather than full breakdowns. They still get assigned to phases in PhaseMap and tracked in CoverageMap.
+   - **If Two-Tier (PATH C):** Files that were NOT deep-scanned appear as lightweight entries (class name, type, base class, line count, interfaces) from surface-merged.md. They still get assigned to phases in PhaseMap and tracked in CoverageMap.
+
+   **IMPORTANT:** Do NOT read the scan files yourself. Spawn the agent and let IT read them. Your context stays lean — you only track file paths and metadata.
 
 9b. **Genre Classification** — Determine the project's primary genre(s) from source patterns:
     | Genre | Detection Signals |
@@ -216,7 +228,7 @@ The main agent now has all scan results from Phase 2 (deep scan results + surfac
 
 ### Generate ARCHITECTURE.md
 
-10. Create `LEARN/{PROJECT}/ARCHITECTURE.md` — follow `.claude/templates/ARCHITECTURE-template.md`. Use this **mandatory Table of Contents**:
+10. The background agent creates `LEARN/{PROJECT}/ARCHITECTURE.md` by reading ALL `_scan/deep-*.md` files from disk. It follows `.claude/templates/ARCHITECTURE-template.md` with this **mandatory Table of Contents**:
 
 ```
 # {PROJECT} — Detailed Architecture Documentation
@@ -264,9 +276,11 @@ The main agent now has all scan results from Phase 2 (deep scan results + surfac
 
 This analysis is the foundation for PhaseMap and StructureMap. Be thorough — missing systems here means missing phases later.
 
+**Once ARCHITECTURE.md is written to disk, spawn a SECOND background agent for PhaseMap + StructureMap.** That agent reads ARCHITECTURE.md from disk (not from the main loop's context). The main loop only needs to know: "ARCHITECTURE.md is at `LEARN/{PROJECT}/ARCHITECTURE.md`" — it does NOT need to hold the content.
+
 ### Generate PhaseMap.md
 
-11. Group all source scripts into logical phases by dependency order:
+11. The PhaseMap agent reads `LEARN/{PROJECT}/ARCHITECTURE.md` + `_scan/deep-*.md` and groups all source scripts into logical phases by dependency order:
     - Phase = set of scripts that can be built and tested independently
     - Rule: each phase depends only on earlier phases, never forward
     - **SIZE CAP: Max ~25 scripts per phase.** If a phase exceeds 25 files, split it into sub-phases (e.g., phase-C → phase-C + phase-D). Reasons: hand-typing fatigue, vertical slice testing scope, manageable PR size. Count ALL files (SO_, Field_, DataService, Orchestrator, SubManager, interfaces, bridges, enums, tests).

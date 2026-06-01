@@ -25,6 +25,9 @@ const CONCURRENCY_CAP = 16
 
 const { project, files, totalWords, scale, scanPath, avgWordsPerFile } = args
 
+// Scan output directory — agents write results to disk to keep orchestrator context lean
+const scanDir = `LEARN/${project}/_scan`
+
 // --- Utility: chunk files by accumulated words ---
 function chunkByWords(fileList, wordsPerFile, targetWordsPerChunk) {
   const chunks = []
@@ -44,11 +47,13 @@ function chunkByWords(fileList, wordsPerFile, targetWordsPerChunk) {
 }
 
 // --- Deep scan prompt template ---
-function deepScanPrompt(filePaths) {
+function deepScanPrompt(filePaths, chunkIndex, totalChunks) {
   return `You are a source code analyzer for a Unity game project called ${project}.
 
 Your job: Read every .cs file in your assigned list and extract structured metadata.
-Return your results as a single structured report (plain text, not JSON).
+Write your results to the file: ${scanDir}/deep-${chunkIndex}.md
+
+IMPORTANT: Write the FULL report to that file path using the Write tool. Your final text return should be a SHORT summary only (e.g. "Scanned X files, found Y singletons, Z god objects"). The detailed report goes in the file.
 
 ## Your assigned files (read ALL of them):
 ${filePaths.join('\n')}
@@ -94,17 +99,23 @@ Table: | Using Statement | Library | Which Files |
 ### COLLECTIONS FOR DATASERVICE
 Table: | Class | Field | Type | Could Extract To |
 
-Be thorough. Read EVERY file. Miss nothing. The accuracy of the entire project architecture depends on your completeness.`
+Be thorough. Read EVERY file. Miss nothing. The accuracy of the entire project architecture depends on your completeness.
+
+REMINDER: Write the full report to ${scanDir}/deep-${chunkIndex}.md — your return text is just a brief summary line.`
 }
 
 // --- Surface scan prompt template ---
-function surfaceScanPrompt(filePaths) {
+function surfaceScanPrompt(filePaths, chunkIndex, totalChunks) {
   return `You are a source code SURFACE scanner for a Unity game project called ${project}.
 
 Your job: Read every .cs file in your assigned list and extract METADATA ONLY.
 Do NOT read method bodies. Only extract: signatures, types, inheritance, field declarations.
 
-Return a structured catalog — one entry per file, in this exact format:
+Write your results to the file: ${scanDir}/surface-${chunkIndex}.md
+
+IMPORTANT: Write the FULL catalog to that file path using the Write tool. Your final text return should be a SHORT summary only (e.g. "Surface-scanned X files"). The detailed catalog goes in the file.
+
+Write a structured catalog — one entry per file, in this exact format:
 
 ### {filename} | {line_count} lines | {type}
 - **Class:** {name} : {base_class} [implements: {interfaces}]
@@ -123,7 +134,9 @@ RULES:
 - Do NOT report private fields (except [SerializeField])
 - If a file is auto-generated (comments say so, or >1000 lines of repetitive pattern), mark "AUTO-GEN" and skip details
 - Simple enums (<30 lines): one-liner format "### {name} | {lines} | Enum | Values: {v1, v2, ...}"
-- Be fast and complete. This is metadata extraction, not analysis.`
+- Be fast and complete. This is metadata extraction, not analysis.
+
+REMINDER: Write the full catalog to ${scanDir}/surface-${chunkIndex}.md — your return text is just a brief summary line.`
 }
 
 // --- Filter schema for structured output ---
@@ -162,8 +175,8 @@ const FILTER_SCHEMA = {
 // EXECUTION
 // =============================================================
 
+// Ensure _scan directory exists (first write creates it via Write tool)
 let scanResults = []
-let surfaceMetadata = ''
 let filterStats = null
 
 if (scanPath === 'C') {
@@ -186,7 +199,7 @@ if (scanPath === 'C') {
 
   const surfaceResults = await parallel(
     surfaceChunks.map((chunk, i) => () =>
-      agent(surfaceScanPrompt(chunk), {
+      agent(surfaceScanPrompt(chunk, i + 1, surfaceAgentCount), {
         label: `surface-${i + 1}/${surfaceAgentCount}`,
         phase: 'Surface Scan'
       })
@@ -194,17 +207,21 @@ if (scanPath === 'C') {
   )
 
   const validSurface = surfaceResults.filter(Boolean)
-  log(`Surface scan complete: ${validSurface.length}/${surfaceAgentCount} agents returned`)
+  log(`Surface scan complete: ${validSurface.length}/${surfaceAgentCount} agents returned (results on disk: ${scanDir}/surface-*.md)`)
 
   // --- Step 2: Filter ---
   phase('Filter')
 
-  const mergedSurface = validSurface.join('\n\n---\n\n')
+  // Surface results are on disk — build file list for the filter agent to read
+  const surfaceFileList = Array.from({length: surfaceAgentCount}, (_, i) => `${scanDir}/surface-${i + 1}.md`)
 
   const filterResult = await agent(
     `You are a file classifier for the Unity project ${project}.
 
-Below is the merged surface catalog from ${validSurface.length} scan agents covering ${files.length} files.
+Read ALL surface catalog files from disk:
+${surfaceFileList.join('\n')}
+
+These contain the merged surface catalog from ${validSurface.length} scan agents covering ${files.length} files.
 Your job: classify each file into deep-scan categories and return a structured result.
 
 ## Filter Rules
@@ -223,8 +240,8 @@ After filtering, estimate deep scan words: count of deepScanFiles × ${avgWordsP
 If estimated > ${MAX_WORDS_PER_AGENT * CONCURRENCY_CAP} (${MAX_WORDS_PER_AGENT * CONCURRENCY_CAP} words = 16 agents × ${MAX_WORDS_PER_AGENT} each):
   Drop "Conditional" category from deepScanFiles → move to skippedFiles.
 
-## Surface Catalog:
-${mergedSurface}
+Also write a merged surface catalog (all files from all surface-*.md combined) to: ${scanDir}/surface-merged.md
+Include the surfaceMetadata field in your structured output as just a reference note: "Written to ${scanDir}/surface-merged.md"
 
 ## Available file paths (use these exact paths):
 ${files.join('\n')}
@@ -246,15 +263,13 @@ Return the classification as structured output.`,
     phase('Deep Scan')
     scanResults = await parallel(
       fallbackChunks.map((chunk, i) => () =>
-        agent(deepScanPrompt(chunk), {
+        agent(deepScanPrompt(chunk, i + 1, fallbackChunks.length), {
           label: `deep-fallback-${i + 1}/${fallbackChunks.length}`,
           phase: 'Deep Scan'
         })
       )
     )
-    surfaceMetadata = mergedSurface
   } else {
-    surfaceMetadata = filterResult.surfaceMetadata
     filterStats = filterResult.stats
 
     log(`Filter: ${filterResult.stats.deepScanCount} files for deep scan, ${filterResult.stats.skippedCount} skipped (${filterResult.stats.filterReduction} reduction)`)
@@ -275,7 +290,7 @@ Return the classification as structured output.`,
     const wave1Chunks = deepChunks.slice(0, CONCURRENCY_CAP)
     const wave1Results = await parallel(
       wave1Chunks.map((chunk, i) => () =>
-        agent(deepScanPrompt(chunk), {
+        agent(deepScanPrompt(chunk, i + 1, deepChunks.length), {
           label: `deep-${i + 1}/${deepChunks.length}`,
           phase: 'Deep Scan'
         })
@@ -290,7 +305,7 @@ Return the classification as structured output.`,
 
       const wave2Results = await parallel(
         wave2Chunks.map((chunk, i) => () =>
-          agent(deepScanPrompt(chunk), {
+          agent(deepScanPrompt(chunk, CONCURRENCY_CAP + i + 1, deepChunks.length), {
             label: `deep-w2-${i + 1}/${wave2Chunks.length}`,
             phase: 'Deep Scan'
           })
@@ -314,7 +329,7 @@ Return the classification as structured output.`,
 
   scanResults = await parallel(
     deepChunks.map((chunk, i) => () =>
-      agent(deepScanPrompt(chunk), {
+      agent(deepScanPrompt(chunk, i + 1, deepChunks.length), {
         label: `deep-${i + 1}/${deepChunks.length}`,
         phase: 'Deep Scan'
       })
@@ -327,15 +342,24 @@ Return the classification as structured output.`,
 // =============================================================
 
 const validResults = scanResults.filter(Boolean)
-log(`Scan complete: ${validResults.length} deep agents returned results`)
+const deepFileCount = validResults.length
+log(`Scan complete: ${deepFileCount} deep agents wrote results to ${scanDir}/deep-*.md`)
+
+// Build the list of files written to disk (for Phase 3 to read)
+const deepScanFiles = Array.from({length: deepFileCount}, (_, i) => `${scanDir}/deep-${i + 1}.md`)
+const surfaceScanFiles = scanPath === 'C'
+  ? Array.from({length: Math.min(CONCURRENCY_CAP, Math.ceil(files.length / SURFACE_FILES_PER_AGENT))}, (_, i) => `${scanDir}/surface-${i + 1}.md`)
+  : []
 
 return {
-  scanResults: validResults,
-  surfaceMetadata: surfaceMetadata,
+  scanDir: scanDir,
+  deepScanFiles: deepScanFiles,
+  surfaceScanFiles: surfaceScanFiles,
+  surfaceMergedFile: scanPath === 'C' ? `${scanDir}/surface-merged.md` : null,
   filterStats: filterStats,
   agentStats: {
     surfaceAgents: scanPath === 'C' ? Math.min(CONCURRENCY_CAP, Math.ceil(files.length / SURFACE_FILES_PER_AGENT)) : 0,
-    deepAgents: validResults.length,
-    totalAgents: (scanPath === 'C' ? Math.min(CONCURRENCY_CAP, Math.ceil(files.length / SURFACE_FILES_PER_AGENT)) + 1 : 0) + validResults.length
+    deepAgents: deepFileCount,
+    totalAgents: (scanPath === 'C' ? Math.min(CONCURRENCY_CAP, Math.ceil(files.length / SURFACE_FILES_PER_AGENT)) + 1 : 0) + deepFileCount
   }
 }
