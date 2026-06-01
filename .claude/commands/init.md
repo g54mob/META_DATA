@@ -127,11 +127,13 @@ This command uses **parallel subagents** to analyze source code faster and with 
 
 > Full strategy, prompt templates, filter rules, and word-budget math are in `.claude/instructions/file-scan.md`. Steps below are the execution sequence.
 
-8-SURFACE. **Launch Surface Scan agents** — lightweight metadata extraction of ALL files:
+8-SURFACE. **Fan-out** — launch surface scan subagents for lightweight metadata extraction of ALL files:
 
-   **Chunking:** File-count-based (exception — surface agents skip method bodies so input words are negligible; the constraint is output catalog length). Formula from `file-scan.md`: `ceil(file_count / 600)` agents (capped at 16), sorted by folder path. Each agent extracts metadata only (no method bodies).
+   **Chunking:** File-count-based (exception — surface agents skip method bodies so input words are negligible; the constraint is output catalog length). Formula from `file-scan.md`: `ceil(file_count / 600)` agents (capped at 16), sorted by folder path. Each subagent extracts metadata only (no method bodies).
 
    **Prompt:** Use the Surface Agent Prompt Template from `file-scan.md`.
+
+   **Barrier** — wait for ALL surface subagents to return before proceeding to 8-FILTER.
 
 8-FILTER. **Merge surface results and classify** (main agent, sequential):
 
@@ -142,13 +144,13 @@ This command uses **parallel subagents** to analyze source code faster and with 
    5. Validate per-agent token budget: `filtered_words / agent_count × 1.33 < 150,000`.
    6. **Build chunked file lists for deep agents:** Sort filtered files by folder path, walk the list accumulating words per chunk. When a chunk reaches `filtered_words / agent_count`, emit it and start a new chunk. This produces the actual file-path lists to hand to each deep agent.
 
-8-DEEP-FILTERED. **Launch Deep Scan agents on filtered file list:**
+8-DEEP-FILTERED. **Fan-out** — launch deep scan subagents on filtered file list:
 
    Standard deep scan (same prompt as PATH B step 8-DEEP-LAUNCH) but ONLY on files that passed the filter. Chunk by accumulated words (≤112k words per agent), not file count.
 
-   **If more than 16 agents needed:** Run in sequential waves (wave 1: 16 agents, wave 2: remainder).
+   **If more than 16 agents needed: Multi-wave** — fan-out wave 1 (16 subagents), barrier (wait for all 16), then fan-out wave 2 (remaining subagents), barrier.
 
-   **After deep scan completes:** Merge deep scan results WITH surface metadata for skipped files.
+   **After barrier (all deep subagents complete):** Collect/merge deep scan results WITH surface metadata for skipped files.
 
    Jump to Phase 3 step 9.
 
@@ -166,7 +168,7 @@ This command uses **parallel subagents** to analyze source code faster and with 
 
    **Chunk by accumulated words:** Sort files by folder path, then walk the list accumulating words per chunk. When a chunk reaches `total_words / agents_to_launch`, emit it and start a new one. This keeps related files together while respecting the word budget per agent.
 
-8-DEEP-LAUNCH. **Launch parallel Agent calls** — one per chunk. Each agent gets this prompt:
+8-DEEP-LAUNCH. **Fan-out** — launch one Agent per chunk in parallel. Each agent (subagent) gets this prompt:
 
    ```
    You are a source code analyzer for a Unity game project called {PROJECT}.
@@ -226,7 +228,7 @@ This command uses **parallel subagents** to analyze source code faster and with 
 
    **FORBIDDEN:** Do NOT use `find`, `bash`, `node`, `python`, temp files, or ANY shell command to build file lists. The Glob tool does this natively. Pass paths directly from Glob results into agent prompts.
 
-8-DEEP-WAIT. **Wait for all scan agents to complete.** Collect all results. (Applies to both PATH B and PATH C deep scan.)
+8-DEEP-WAIT. **Barrier** — wait for ALL scan subagents to complete. Collect all results. (Applies to both PATH B and PATH C deep scan.)
 
 ---
 
@@ -236,7 +238,7 @@ The main agent now has all scan results from Phase 2 (deep scan results + surfac
 
 ### Merge & Analyze
 
-9. **Merge all agent reports** into a unified picture:
+9. **Collect/Merge** — combine all subagent reports into a unified picture:
    - Combine all DEPENDENCY EDGES tables → full dependency graph
    - Combine all SINGLETONS FOUND → execution order candidates
    - Combine all INTERFACES FOUND → interface catalog
@@ -430,7 +432,7 @@ This analysis is the foundation for PhaseMap and StructureMap. Be thorough — m
 
 **Now that ARCHITECTURE.md, PhaseMap.md, and StructureMap.md exist**, the remaining docs can be generated **in parallel** because they only READ the core docs — they don't depend on each other.
 
-**Launch 6 parallel Agent calls:**
+**Fan-out — launch 6 subagents in parallel:**
 
 ### Agent A — GOAL.md
 
@@ -640,7 +642,7 @@ Follow csharp-conventions.md exactly for all .cs files (camelCase, no CONSTANT_C
 Write ALL files.
 ```
 
-### Wait for all 6 agents to complete.
+### Barrier — wait for all 6 subagents to complete.
 
 ---
 
@@ -757,7 +759,7 @@ Agent counts derived from word-based formula: `deep_agents = ceil(words / 112,00
 - **If the project is Micro/Small (≤149 files):** Skip Phase 2 entirely. Main agent reads all files directly (they fit in 200k). Phase 4 parallelization still applies for doc generation.
 - **If context compaction triggers during Phase 3:** This is expected for XLarge+ projects. The agent reports from Phase 2 are already structured summaries — compaction of the raw reports is acceptable because the key data (dependency edges, events, interfaces) is tabular and survives summarization well.
 - **If a surface agent fails (Two-Tier only):** Main agent re-reads that chunk's files with surface-level extraction directly. Slower but functional.
-- **If filtered_words > 1.79M (needs >16 deep agents):** Run deep scan in sequential waves (16 agents per wave, each getting ≤112k words). See `file-scan.md` for multi-wave details.
+- **If filtered_words > 1.79M (needs >16 deep agents): Multi-wave** — fan-out 16 subagents (wave 1), barrier, then fan-out remaining subagents (wave 2), barrier. Each subagent gets ≤112k words. See `file-scan.md` for details.
 - **If per-agent token budget still exceeds 150k after filtering:** Tighten the filter — drop "Conditional" category entirely and deep-scan only "Must" + "Should" files. The conditionally-skipped files still appear in docs via their surface metadata.
 - **If total agents would exceed 60:** The project is at the extreme end (Titan). Cap deep waves at 2 (32 deep agents max). If still insufficient, accept slightly reduced per-file attention quality by increasing word budget to 130k/agent.
 - **Surface metadata for skipped files:** Files that don't get deep-scanned still appear in ARCHITECTURE.md, PhaseMap.md, and CoverageMap.md using their surface metadata (class name, type, base class, interfaces, line count). This ensures 100% coverage without 100% deep reads.

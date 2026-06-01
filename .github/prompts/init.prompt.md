@@ -31,31 +31,56 @@ agent: "agent"
 5. Cross-reference the `.stub` hierarchy against `MAIN-SOURCE/{PROJECT}/` — identify:
    - Which folders are asset-only (listed in .stub but not present — 3D, audio, textures, scenes)
    - Which contains engine/third-party DLLs (skip these)
-6. Read **every single `.cs` file** in `MAIN-SOURCE/{PROJECT}/Scripts/Assembly-CSharp/` (or equivalent game code folder). This is the actual game source — read ALL of them, no skipping.
+6. **Enumerate all `.cs` files** in the game code folder using file search. Count them AND estimate total words:
+   - Sample 10–20 files spread evenly (first, middle, last, random)
+   - Estimate ~8 words/line for C# → `avg_words_per_file = sum(sample_line_counts × 8) / sample_count`
+   - `total_words_estimate = avg_words_per_file × total_file_count`
+   - Record both file count and word estimate — these determine scale and reading strategy
+
+6b. **Read ALL source files** — read **every single `.cs` file** in `MAIN-SOURCE/{PROJECT}/Scripts/Assembly-CSharp/` (or equivalent game code folder). No skipping, no exceptions:
    - Start with the 10 largest files (god-objects that reveal the dependency graph)
-   - Then read every remaining `.cs` file
+   - Then read every remaining `.cs` file — ALL of them
+   - **Reading depth guidance for Large+ projects (400+ files / 400k+ words):** Every file MUST be read, but extraction depth can vary by significance:
+     - **Full extraction:** MonoBehaviours >100 lines, Singletons, NetworkBehaviours, God objects (600+ lines), ScriptableObjects with 5+ fields, classes with 5+ public methods, classes implementing 2+ interfaces
+     - **Standard extraction:** Medium classes (100–300 lines) — still read fully, extract all metadata from step 7
+     - **Lightweight extraction:** Trivial enums (<30 lines), auto-generated files, empty interfaces, tiny data structs <50 lines — still read, but record class name, type, base class, interfaces, line count, values
+   - Every file gets read. Every file gets tracked. The depth guidance only affects how much detail goes into your working notes — it does NOT mean skip files.
+
 7. For each file read, extract: class name, base class, interfaces implemented, singletons, [SerializeField] fields, public methods, FindObjectOfType calls, event subscriptions/raises, direct references to other classes
 8. Map the full dependency graph: who imports who, who calls who, who subscribes to whose events. Count total files.
 
-8b. **Project Scale Profile** — Count total `.cs` files and classify:
-    | Scale | File Count | Architecture Approach |
-    |-------|-----------|----------------------|
-    | Micro | <50 | 2-3 phases max, minimal sub-systems, single DataService per domain, skip SystemIsolationAnalysis |
-    | Small | 50-149 | 3-5 phases, standard _-Systems/ approach, full docs |
-    | Medium | 150-399 | 5-8 phases, full architecture, all docs mandatory |
-    | Large | 400-799 | 8-12 phases, aggressive splitting, full docs + Phase Dependency DAG |
-    | XLarge | 800-1999 | 10-15 phases, sub-phase strategy, domain boundary splits |
-    | Massive | 2000+ | 12-20+ phases, sub-phase numbering (C-1, C-2), dedicated domain boundaries |
+8a. **Synthesis Checklist** — After reading all files, produce these specific summary tables (used by ARCHITECTURE.md sections 3-7):
+    - **Dependency edges:** | Source Class | Target Class | Relationship (Inherits/Implements/References/Subscribes/FindsObject/StaticAccess) |
+    - **Singletons found:** | Class | Access Pattern | What It Manages |
+    - **Interfaces found:** | Interface | Methods | Likely Purpose |
+    - **God objects:** | File | Lines | Responsibilities (3+) | Suggested Split |
+    - **Events declared:** | Class | Event Name | Delegate Type | Raised Where |
+    - **Third-party usage:** | Using Statement | Library | Which Files |
+    - **Collections for DataService:** | Class | Field | Type | Could Extract To |
+    Cross-check total files analyzed against the file search count from step 6. If any files are missing, go back and read them.
+
+8b. **Project Scale Profile** — Using file count and word estimate from step 6, classify:
+    | Scale | File Count | Words | Architecture Approach |
+    |-------|-----------|-------|----------------------|
+    | Micro | <50 | <50k | 2-3 phases max, minimal sub-systems, single DataService per domain, skip SystemIsolationAnalysis |
+    | Small | 50-149 | 50k-150k | 3-5 phases, standard _-Systems/ approach, full docs |
+    | Medium | 150-399 | 150k-400k | 5-8 phases, full architecture, all docs mandatory |
+    | Large | 400-799 | 400k-800k | 8-12 phases, aggressive splitting, full docs + Phase Dependency DAG |
+    | XLarge | 800-1999 | 800k-1.5M | 10-15 phases, sub-phase strategy, domain boundary splits |
+    | Massive | 2000-3999 | 1.5M-2.5M | 12-20+ phases, sub-phase numbering (C-1, C-2), dedicated domain boundaries |
+    | Colossal | 4000-6999 | 2.5M-4M | 15-25 phases, domain partitioning, aggressive filtering |
+    | Titan | 7000+ | 4M+ | 20-30+ phases, strict domain partitioning, maximum filtering |
     
     **Scale adjustments:**
     - **Micro (<50 files):** Combine related systems into fewer, larger _-Systems/ folders (e.g., one PlayerSystem instead of separate Movement + Inventory + Health systems). Skip SystemIsolationAnalysis.md. Estimate.md can use simplified single-tier formula. PhaseMap gap audit can be abbreviated.
     - **Small (50-149):** Standard approach applies as-is.
     - **Medium (150-399):** Full architecture, no shortcuts.
-    - **Large (400-799):** Generate a "Phase Dependency DAG" section showing all inter-phase imports. Consider splitting broad systems into sub-systems.
-    - **XLarge (800-1999):** Sub-phase numbering (e.g., phase-C-1, phase-C-2). Domain boundaries take priority over file count for phase splits.
-    - **Massive (2000+):** All XLarge rules plus: group phases into "arcs" (Core arc, Gameplay arc, Content arc). Consider parallel-safe phase groups. Generate a top-level "Arc Map" section in PhaseMap.md.
+    - **Large (400-799):** Generate a "Phase Dependency DAG" section showing all inter-phase imports. Consider splitting broad systems into sub-systems. Use priority-based reading from step 6b.
+    - **XLarge (800-1999):** Sub-phase numbering (e.g., phase-C-1, phase-C-2). Domain boundaries take priority over file count for phase splits. Priority-based reading essential.
+    - **Massive (2000-3999):** All XLarge rules plus: group phases into "arcs" (Core arc, Gameplay arc, Content arc). Consider parallel-safe phase groups. Generate a top-level "Arc Map" section in PhaseMap.md.
+    - **Colossal/Titan (4000+):** All Massive rules. These projects push single-agent context limits — still read every file, but use lightweight extraction for trivial files to manage context. Consider using `/init-pro` in Claude Code for multi-agent coverage at this scale.
     
-    Record scale in ARCHITECTURE.md header. Scale influences PhaseMap granularity and doc verbosity.
+    Record scale (including word estimate) in ARCHITECTURE.md header. Scale influences PhaseMap granularity and doc verbosity.
 
 8c. **Genre Classification** — Determine the project's primary genre(s) from source patterns:
     | Genre | Detection Signals |
@@ -362,7 +387,7 @@ This analysis is the foundation for PhaseMap and StructureMap. Be thorough — m
 
 ## Generate phase-All/ Scaffolding
 
-26. Create `LEARN/{PROJECT}/phase-All/` with the shared foundation scripts that ALL phases depend on:
+26. **Read `.github/instructions/csharp-conventions.instructions.md`** before writing any .cs files below. Then create `LEARN/{PROJECT}/phase-All/` with the shared foundation scripts that ALL phases depend on:
 
     ```
     phase-All/
@@ -482,7 +507,7 @@ This analysis is the foundation for PhaseMap and StructureMap. Be thorough — m
     - [split decisions: which god-objects to split and how]
     - [system classifications: which systems are L0 vs L1+]
 
-    **What Changed:** Created ARCHITECTURE.md, GOAL.md, NewAgent.md, PhaseMap.md, StructureMap.md, Estimate.md, SystemPortabilityMap.md, CoverageMap.md, OptionalFeatures.md, surfer.md, phase-All/.
+    **What Changed:** Created ARCHITECTURE.md, GOAL.md, NewAgent.md, PhaseMap.md, StructureMap.md, Estimate.md, SystemPortabilityMap.md, CoverageMap.md, SystemIsolationAnalysis.md, OptionalFeatures.md, GameStateSoFar.md, surfer.md, phase-All/.
 
     ---
     ```
@@ -512,4 +537,12 @@ This analysis is the foundation for PhaseMap and StructureMap. Be thorough — m
     - [ ] phase-All/7-3D/ has MODEL.md, ANIM.md, WORLD.md (or N/A placeholders)
     - [ ] surfer.md has Prompt 1 entry
 
-29. Output summary: total scripts found (code), total assets found (from .stub), phases planned, systems identified, estimated hours, phase-All/ scripts created, docs generated (count — including GameStateSoFar.md)
+29. Output summary:
+    - Total scripts found (file count + estimated total words)
+    - Scale classification (Micro/Small/Medium/Large/XLarge/Massive/Colossal/Titan)
+    - Total assets found (from .stub)
+    - Phases planned (count + names)
+    - Systems identified (count)
+    - Estimated hours
+    - phase-All/ scripts created (count)
+    - Docs generated (count — including GameStateSoFar.md, SystemIsolationAnalysis.md)
