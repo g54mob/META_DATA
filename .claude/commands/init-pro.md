@@ -1,30 +1,38 @@
 ---
-description: "Workflow-powered /init — same output as /init but uses deterministic JS workflows for Phase 2 (scan) and Phase 4 (docs). Guaranteed agent spawning, word-based chunking, structured output, and resumability. Use for Massive/Colossal/Titan projects. CLI-only (requires Claude Code Workflow tool)."
+description: "Workflow-powered /init — deterministic JS workflows for scan + doc-gen. Same output as /init but guaranteed agent counts, word-budget enforcement, structured output, resumability. CLI-only (requires Claude Code Workflow tool). Use for Massive/Colossal/Titan projects or when determinism matters."
 ---
 
 # /init-pro — Deterministic Workflow Architecture Bootstrap
 
-Same output as `/init` (13 docs + phase-All/) but uses **deterministic Workflow JS scripts** for the mechanical phases. Claude handles reasoning; workflows handle sweeps.
+Same output as `/init` (13 docs + phase-All/) but Phases 2 and 4 use **deterministic Workflow JS scripts** instead of natural-language agent spawning. Claude handles reasoning (Phases 1/3/5); workflows handle mechanical sweeps (Phases 2/4).
+
+**When to use:** Massive+ projects (2000+ files), or anytime deterministic agent spawning + resume matters. CLI-only — Windsurf/Copilot cannot run workflows.
+
+The orchestration follows a strict dependency DAG:
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 1: Setup (Claude — interactive + reasoning)                    │
 │   Ask project → verify source → read .stub → create folders        │
-│   Determine scale → estimate words → select scan path              │
-│   Build file list + compute args for workflow                       │
+│   Determine scale → estimate words → build workflow args            │
 └─────────────────────────┬───────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 2: Source Scan (Workflow JS — deterministic)                   │
 │   Script: .claude/workflows/init-phase2-scan.js                     │
-│   PATH B: word-chunked deep scan (2-14 agents, exact)              │
-│   PATH C: surface (4-16) → filter → deep (2-32, multi-wave)        │
-│   Returns: { scanResults[], surfaceMetadata, filterStats }          │
+│                                                                     │
+│   PATH A (≤149 files): Skip workflow — main reads directly          │
+│   PATH B (150-1999): word-chunked deep scan (exact agent count)     │
+│   PATH C (2000+): surface → schema-validated filter → deep          │
+│                   (multi-wave automatic if >16 agents needed)        │
+│                                                                     │
+│   Returns: { scanResults[], surfaceMetadata, filterStats, agentStats }
 └─────────────────────────┬───────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 3: Synthesis (Claude — deep reasoning)                         │
-│   Merge scan results → dependency graph → genre → skills            │
+│   Merge scan results + surface metadata for skipped files           │
+│   Build full dependency graph                                       │
 │   Generate ARCHITECTURE.md (requires full intelligence)             │
 │   Generate PhaseMap.md (requires judgment on phase boundaries)      │
 │   Generate StructureMap.md (requires PhaseMap)                      │
@@ -33,7 +41,7 @@ Same output as `/init` (13 docs + phase-All/) but uses **deterministic Workflow 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 4: Doc Generation (Workflow JS — deterministic)                │
 │   Script: .claude/workflows/init-phase4-docs.js                     │
-│   6 agents in parallel: GOAL, NewAgent, Estimate+Portability,       │
+│   6 agents in parallel(): GOAL, NewAgent, Estimate+Portability,     │
 │   Coverage+Isolation, Optional+GameState, phase-All/                │
 │   Returns: { docsGenerated, failed, agents[] }                      │
 └─────────────────────────┬───────────────────────────────────────────┘
@@ -46,93 +54,118 @@ Same output as `/init` (13 docs + phase-All/) but uses **deterministic Workflow 
 
 ---
 
-## When to Use /init-pro vs /init
+## PHASE 1 — Setup (Main Agent, Sequential)
 
-| Scenario | Use |
-|----------|-----|
-| Micro/Small projects (≤149 files) | `/init` — no agents needed anyway |
-| Medium projects (150-399 files, <400k words) | `/init` — works fine, fewer moving parts |
-| Large/XLarge projects (400-1999 files) | Either — `/init-pro` gives determinism but `/init` is adequate |
-| **Massive/Colossal/Titan** (2000+ files OR >1.5M words) | **`/init-pro`** — deterministic chunking, resume, structured output |
-| Running on Windsurf or Copilot | `/init` — workflows are Claude Code-exclusive |
+1. Ask: "Which project?" → sets `{PROJECT}` (e.g., `project-0`)
+2. Verify `MAIN-SOURCE/{PROJECT}/` exists and contains source scripts
+3. Read `MAIN-SOURCE/entire-{PROJECT}.stub` — this is the COMPLETE file hierarchy of the original project including assets excluded due to size. Use it to understand the full project scope (3D models, audio, prefabs, scenes, etc.) even if those files aren't physically present.
+4. Create `LEARN/{PROJECT}/` folder structure if it doesn't exist
+4b. Read ALL templates in `.claude/templates/` — these define the exact structure for every generated doc:
+    - `ARCHITECTURE-template.md` → format for ARCHITECTURE.md
+    - `PhaseMap-template.md` → format for PhaseMap.md
+    - `StructureMap-template.md` → format for StructureMap.md
+    - `SystemPortabilityMap-template.md` → format for SystemPortabilityMap.md
+    - `SystemIsolationAnalysis-template.md` → format for SystemIsolationAnalysis.md
+    - `CoverageMap-template.md` → format for CoverageMap.md
+    - `Estimate-template.md` → format for Estimate.md
+    - `OptionalFeatures-template.md` → format for OptionalFeatures.md
+    - `GameStateSoFar-template.md` → format for GameStateSoFar.md
+    - `surfer-template.md` → format for surfer.md
+    - `GOAL-general.md` → copied into GOAL.md
+    - `NewAgent-general.md` → copied into NewAgent.md
 
----
+5. Cross-reference the `.stub` hierarchy against `MAIN-SOURCE/{PROJECT}/` — identify:
+   - Which folders are asset-only (listed in .stub but not present — 3D, audio, textures, scenes)
+   - Which contains engine/third-party DLLs (skip these)
+   - Locate the game code folder: `MAIN-SOURCE/{PROJECT}/Scripts/Assembly-CSharp/` (or equivalent)
 
-## PHASE 1 — Setup (Claude, Interactive)
+6. **Enumerate all `.cs` files** in the game code folder using Glob. Count them AND estimate total words (sample 10 files, average words/file × count). Determine scale:
+    | Scale | File Count | Words | Architecture Approach |
+    |-------|-----------|-------|----------------------|
+    | Micro | <50 | <50k | 2-3 phases max, minimal sub-systems, single DataService per domain, skip SystemIsolationAnalysis |
+    | Small | 50-149 | 50k-150k | 3-5 phases, standard _-Systems/ approach, full docs |
+    | Medium | 150-399 | 150k-400k | 5-8 phases, full architecture, all docs mandatory |
+    | Large | 400-799 | 400k-800k | 8-12 phases, aggressive splitting, full docs + Phase Dependency DAG |
+    | XLarge | 800-1999 | 800k-1.5M | 10-15 phases, sub-phase strategy, domain boundary splits |
+    | Massive | 2000-3999 | 1.5M-2.5M | 12-20+ phases, sub-phase numbering (C-1, C-2), dedicated domain boundaries |
+    | Colossal | 4000-6999 | 2.5M-4M | 15-25 phases, domain partitioning, aggressive filtering |
+    | Titan | 7000+ | 4M+ | 20-30+ phases, strict domain partitioning, maximum filtering |
 
-Identical to `/init` Phase 1. Execute steps 1-6b from `/init`:
-
-1. Ask: "Which project?" → sets `{PROJECT}`
-2. Verify `MAIN-SOURCE/{PROJECT}/` exists
-3. Read `MAIN-SOURCE/entire-{PROJECT}.stub`
-4. Create `LEARN/{PROJECT}/` folder structure
-4b. Read ALL templates in `.claude/templates/`
-5. Cross-reference `.stub` vs `MAIN-SOURCE/{PROJECT}/` → locate game code folder
-6. **Enumerate all `.cs` files** → count files AND estimate total words:
-   - Sample 10-20 files (spread evenly: first, middle, last, random)
-   - Count words per sample (line_count × ~8 words/line for C#)
-   - `avg_words_per_file = sum(sample_words) / sample_count`
-   - `total_words = avg_words_per_file × total_file_count`
-   - **Shortcut:** If project is in WORKSPACE-REG.md, use the Words column directly.
-   - Determine scale from the table in `/init` step 6.
-
-6b. **Determine scan path:**
-   - **PATH A (Micro/Small, ≤149 files):** Skip workflow. Read all files directly → jump to Phase 3.
-   - **PATH B (Medium/Large/XLarge, 150-1999 files, ≤1.5M words):** Use workflow with `scanPath: "B"`.
-   - **PATH C (Massive/Colossal/Titan, 2000+ files OR >1.5M words):** Use workflow with `scanPath: "C"`.
-
-7. **Build the args object** for the Phase 2 workflow:
-   ```
-   args = {
-     project: "{PROJECT}",
-     files: [array of ALL .cs absolute file paths from Glob],
-     totalWords: estimated_total_words,
-     scale: "Medium" | "Large" | "XLarge" | "Massive" | "Colossal" | "Titan",
-     scanPath: "B" | "C",
-     avgWordsPerFile: avg_words_per_file
-   }
-   ```
+6b. **Determine scan strategy** — reference `.claude/instructions/file-scan.md` for full details:
+    - **Micro/Small (≤149 files):** No fan-out. Main agent reads all directly.
+    - **Medium through XLarge (150-1999 files):** Deep-scan-only (original strategy).
+    - **Massive/Colossal/Titan (2000+ files OR >1.5M words):** Two-tier scan (surface → filter → deep).
 
 ---
 
 ## PHASE 2 — Source Scan (Workflow, Deterministic)
 
-**Call the Workflow tool:**
+**Goal:** Read every `.cs` file and extract structured metadata using a deterministic JS workflow.
 
-```
-Workflow({
-  scriptPath: ".claude/workflows/init-phase2-scan.js",
-  args: { project, files, totalWords, scale, scanPath, avgWordsPerFile }
-})
-```
+7. **Select scan path and build args:**
 
-**What it does internally:**
-- PATH B: Computes `ceil(totalWords / 112,000)` deep agents, chunks files by accumulated words, spawns all in parallel, returns results.
-- PATH C: Spawns `ceil(fileCount / 600)` surface agents → gets structured filter classification → spawns word-chunked deep agents on filtered list (multi-wave if >16 needed) → returns results.
+   **PATH A — Direct Read (Micro/Small, ≤149 files):**
+   Skip workflow. Main agent reads all files directly (fits in 200k). Jump to Phase 3 step 9.
 
-**What it returns:**
+   **PATH B or C — Use Workflow:**
+   Build the args object and invoke the workflow:
+
+   ```
+   Workflow({
+     scriptPath: ".claude/workflows/init-phase2-scan.js",
+     args: {
+       project: "{PROJECT}",
+       files: [array of ALL .cs absolute file paths from Glob — SORTED BY FOLDER PATH],
+       totalWords: estimated_total_words,
+       scale: "Medium" | "Large" | "XLarge" | "Massive" | "Colossal" | "Titan",
+       scanPath: "B" | "C",
+       avgWordsPerFile: avg_words_per_file
+     }
+   })
+   ```
+
+### What the workflow does internally:
+
+- **PATH B (150-1999 files):** Computes `ceil(totalWords / 112,000)` deep agents, chunks files by accumulated words (folder-sorted), spawns all in `parallel()`, returns results.
+- **PATH C (2000+ files):** Spawns `ceil(fileCount / 600)` surface agents → collects metadata → invokes a filter agent with `{schema: FILTER_SCHEMA}` for structured JSON classification → spawns word-chunked deep agents on filtered list (multi-wave via sequential `parallel()` calls if >16 needed) → returns merged results.
+
+### What it returns:
+
 ```json
 {
   "scanResults": ["agent1 report text", "agent2 report text", ...],
-  "surfaceMetadata": "merged catalog for skipped files (PATH C only)",
-  "filterStats": { "totalFiles": N, "deepScanCount": N, "skippedCount": N, ... },
+  "surfaceMetadata": "merged catalog for skipped files (PATH C only, empty string for PATH B)",
+  "filterStats": { "totalFiles": N, "deepScanCount": N, "skippedCount": N, "filterReduction": "X%" },
   "agentStats": { "surfaceAgents": N, "deepAgents": N, "totalAgents": N }
 }
 ```
 
-**If the workflow fails:** The result will indicate partial completion. Read the error, then fall back to manually spawning agents for the failed chunks (same as `/init` fallback behavior).
+### Determinism guarantees (vs /init):
+
+| Feature | /init (natural-language) | /init-pro (workflow) |
+|---------|------------------------|---------------------|
+| Agent count | Claude interprets "spawn N" | **Exact** — JS computes `ceil(words/112k)` |
+| Word-budget per agent | Claude approximates | **Validated** — JS asserts < 150k tokens |
+| Multi-wave | Claude might forget wave 2 | **Automatic** — JS loop |
+| Filter output | Free-text | **JSON schema** validated |
+| Resume on failure | Re-run from scratch | **`resumeFromRunId`** replays cached agents |
+
+### Error handling:
+
+- If workflow returns partial results (`scanResults` has nulls), inspect `agentStats` to identify failed chunks. Fall back to manually reading those chunks.
+- If workflow fails entirely, fall back to `/init` Phase 2 behavior (manual agent spawning).
 
 **Wait for workflow to complete before proceeding.**
 
 ---
 
-## PHASE 3 — Synthesis (Claude, Deep Reasoning)
+## PHASE 3 — Synthesis (Main Agent, Sequential)
 
-The main agent now has structured scan results from the workflow. This is the critical phase — it requires full intelligence for architectural judgment and CANNOT be abbreviated.
+The main agent now has all scan results from Phase 2 (deep scan results + surface metadata for skipped files if Two-Tier). This is the critical synthesis step — it CANNOT be parallelized because each doc depends on the previous.
 
 ### Merge & Analyze
 
-9. **Merge all scan reports** into a unified picture:
+9. **Merge all agent reports** into a unified picture:
    - Combine all DEPENDENCY EDGES tables → full dependency graph
    - Combine all SINGLETONS FOUND → execution order candidates
    - Combine all INTERFACES FOUND → interface catalog
@@ -141,7 +174,7 @@ The main agent now has structured scan results from the workflow. This is the cr
    - Combine all THIRD-PARTY USAGE → third-party dependency list
    - Combine all COLLECTIONS FOR DATASERVICE → DataService extraction candidates
    - Count total files analyzed. Cross-check against Glob count from step 6.
-   - **If PATH C:** Also merge `surfaceMetadata` for files that were NOT deep-scanned. These files appear in ARCHITECTURE.md as lightweight entries (class name, type, base class, line count, interfaces) rather than full breakdowns. They still get assigned to phases in PhaseMap and tracked in CoverageMap.
+   - **If Two-Tier (PATH C):** Also merge surface metadata for files that were NOT deep-scanned. These files appear in ARCHITECTURE.md as lightweight entries (class name, type, base class, line count, interfaces) rather than full breakdowns. They still get assigned to phases in PhaseMap and tracked in CoverageMap.
 
 9b. **Genre Classification** — Determine the project's primary genre(s) from source patterns:
     | Genre | Detection Signals |
@@ -324,7 +357,7 @@ This analysis is the foundation for PhaseMap and StructureMap. Be thorough — m
 
 ## PHASE 4 — Doc Generation (Workflow, Deterministic)
 
-**Call the Workflow tool:**
+**Now that ARCHITECTURE.md, PhaseMap.md, and StructureMap.md exist**, invoke the doc generation workflow:
 
 ```
 Workflow({
@@ -337,9 +370,20 @@ Workflow({
 })
 ```
 
-**What it does:** Spawns 6 agents in parallel — GOAL.md, NewAgent.md, Estimate+Portability, Coverage+Isolation, Optional+GameState, phase-All/. Each agent reads the docs generated in Phase 3 and writes its assigned files.
+### What it does:
 
-**What it returns:**
+Spawns 6 agents in `parallel()`:
+- **Agent A:** GOAL.md (from GOAL-general.md template + PhaseMap + ARCHITECTURE)
+- **Agent B:** NewAgent.md (from NewAgent-general.md template + PhaseMap + ARCHITECTURE)
+- **Agent C:** Estimate.md + SystemPortabilityMap.md (from templates + PhaseMap + StructureMap)
+- **Agent D:** CoverageMap.md + SystemIsolationAnalysis.md (from templates + PhaseMap + StructureMap + ARCHITECTURE)
+- **Agent E:** OptionalFeatures.md + GameStateSoFar.md (from templates + PhaseMap + ARCHITECTURE + StructureMap)
+- **Agent F:** phase-All/ scaffolding (Singleton.cs, GameEvents.cs, UIManager.cs, GlobalEnumsAll.cs, Utils.cs, 7-3D/ docs)
+
+Each agent reads its required templates + Phase 3 docs and writes its assigned files. Full prompts are embedded in the workflow script.
+
+### What it returns:
+
 ```json
 {
   "docsGenerated": 6,
@@ -347,26 +391,52 @@ Workflow({
   "agents": [
     { "index": 0, "label": "GOAL.md", "success": true },
     { "index": 1, "label": "NewAgent.md", "success": true },
-    ...
+    { "index": 2, "label": "Estimate+Portability", "success": true },
+    { "index": 3, "label": "Coverage+Isolation", "success": true },
+    { "index": 4, "label": "Optional+GameState", "success": true },
+    { "index": 5, "label": "phase-All", "success": true }
   ]
 }
 ```
 
-**If any agent fails:** The `agents[]` array shows which ones. Generate the missing doc content directly in the main context (same as `/init` fallback).
+### Error handling:
+
+- If any agent fails (`success: false`), generate that specific doc directly in the main context.
+- The `agents[]` array tells you exactly which ones need manual generation.
 
 **Wait for workflow to complete before proceeding.**
 
 ---
 
-## PHASE 5 — Verify & Finalize (Claude, Judgment)
+## PHASE 5 — Verify & Finalize (Main Agent, Sequential)
 
-Same as `/init` Phase 5:
+17. **Generate surfer.md** — Create `LEARN/{PROJECT}/surfer.md` following `.claude/templates/surfer-template.md`:
 
-17. **Generate surfer.md** — Create `LEARN/{PROJECT}/surfer.md` with Prompt 1 entry documenting:
-    - Key discoveries (god-objects, coupling hotspots, system count)
-    - Decisions made (phase boundaries, splits, classifications)
-    - What changed (all docs created)
-    - **Add workflow stats:** surface agents used, deep agents used, filter reduction %
+    ```markdown
+    # {PROJECT} — Reasoning Log
+
+    > Append after each agent prompt. Never edit previous entries — only add new ones.
+    > Each entry captures: what was asked, what was decided, what was discovered, what changed.
+
+    ---
+
+    ## Prompt 1 — Initial Source Analysis (`/init`)
+
+    **Asked:** Bootstrap all architecture docs from raw source.
+
+    **Key Discoveries:**
+    - [list major findings: god-objects, coupling hotspots, system count, total files]
+    - [list surprising patterns: unusual inheritance, missing events, duplicate logic]
+
+    **Decisions Made:**
+    - [phase grouping rationale: why these boundaries]
+    - [split decisions: which god-objects to split and how]
+    - [system classifications: which systems are L0 vs L1+]
+
+    **What Changed:** Created ARCHITECTURE.md, GOAL.md, NewAgent.md, PhaseMap.md, StructureMap.md, Estimate.md, SystemPortabilityMap.md, CoverageMap.md, OptionalFeatures.md, GameStateSoFar.md, SystemIsolationAnalysis.md, surfer.md, phase-All/.
+
+    ---
+    ```
 
 18. **Run completeness check** — verify ALL of these pass:
     - [ ] ARCHITECTURE.md has ALL source files documented (cross-check file count from step 6). For Two-Tier projects: deep-scanned files get full entries, surface-only files get lightweight entries (class, type, base, line count). Both categories must be present — no orphans.
@@ -388,55 +458,70 @@ Same as `/init` Phase 5:
     - [ ] phase-All/7-3D/ has MODEL.md, ANIM.md, WORLD.md (or N/A placeholders)
     - [ ] surfer.md has Prompt 1 entry
 
-    **If any check fails:** Fix it directly. If a Phase 4 workflow agent missed something, generate the missing content in the main context.
+    **If any check fails:** Fix it directly. If a Phase 4 agent missed something, generate the missing content in the main context.
 
-19. **Output summary:**
-    - Total scripts found (count + total words)
-    - Scale classification + scan path used
-    - Total assets (from .stub)
+19. **Output summary** to user:
+    - Total scripts found (code count + total words)
+    - Scale classification (Micro/Small/Medium/Large/XLarge/Massive/Colossal/Titan)
+    - Scan path used (A: direct / B: deep-only / C: two-tier)
+    - Total assets found (from .stub)
     - Phases planned (count + names)
     - Systems identified (count)
     - Estimated hours
     - phase-All/ scripts created (count)
-    - Docs generated (count)
-    - **Workflow stats:**
-      - Phase 2: surface agents + deep agents + filter reduction %
-      - Phase 4: 6 doc agents (successes/failures)
-      - Total agents spawned (deterministic count)
-      - Resume capability: report runId for potential future resume
+    - Docs generated (count — including GameStateSoFar.md, SystemIsolationAnalysis.md)
+    - **Agent stats:** surface agents + deep agents + doc agents = total agent calls
+    - **If Two-Tier:** files surface-scanned, files deep-scanned, files skipped (surface-only), filter reduction %
 
 ---
 
-## Advantages Over /init
+## Scale-Adaptive Behavior
 
-| Feature | /init (natural-language) | /init-pro (workflow hybrid) |
-|---------|------------------------|---------------------------|
-| Agent spawn | Best-effort (Claude interprets) | **Deterministic** (JS spawns exactly N) |
-| Word-budget enforcement | Claude approximates | **Exact math** (JS computes) |
-| Resume on failure | Re-run from scratch | **`resumeFromRunId`** replays cached agents |
-| Structured filter output | Free-text classification | **JSON schema** validated |
-| Multi-wave handling | Claude might forget wave 2 | **Automatic** (JS loop) |
-| Phase 3/5 reasoning | Full intelligence | **Same** (Claude does these phases) |
-| Wall-clock overhead | Claude thinks between agent batches | **Zero dispatch overhead** for mechanical phases |
-| Portability | Windsurf/Copilot (degraded) | **Claude Code CLI only** |
+| Scale | Words | Surface Agents | Deep Agents `ceil(w/112k)` | Doc Agents | Total Agents | Speedup |
+|-------|-------|---------------|---------------------------|------------|--------------|---------|
+| Micro (<50k) | <50k | 0 | 0 (main reads) | 6 | 6 | ~2x |
+| Small (50k-150k) | 50k-150k | 0 | 0 (main reads) | 6 | 6 | ~2x |
+| Medium (150k-400k) | 150k-400k | 0 | 2-4 | 6 | 8-10 | ~3x |
+| Large (400k-800k) | 400k-800k | 0 | 4-8 | 6 | 10-14 | ~4x |
+| XLarge (800k-1.5M) | 800k-1.5M | 0 | 8-14 | 6 | 14-20 | ~5-6x |
+| Massive (1.5M-2.5M) | 1.5M-2.5M | 4-8 | 8-16 | 6 | 18-30 | ~6-8x |
+| Colossal (2.5M-4M) | 2.5M-4M | 8-14 | 16 (1 wave) | 6 | 30-36 | ~8-10x |
+| Titan (4M+) | 4M+ | 14-16 | 16-32 (2 waves) | 6 | 36-54 | ~10-12x |
+
+**Why this works:**
+- **Distribution is word-primary** — agents are sized by total words (≤112k words = ≤150k tokens per agent), not file count. This prevents both context overflow (too many heavy files) and waste (too many tiny files per agent).
+- **Surface agents** extract metadata only (~30-50 output words/file) — trivially within budget even at 600 files/agent.
+- **Deep agents** get ≤112k words of source each (architecturally significant files only) — full focused attention within 200k context.
+- **The filter step** (between surface and deep) eliminates 50-70% of files that don't need full analysis. Their surface metadata still flows into Phase 3.
+- **Multi-wave deep scan** runs sequential batches of 16 agents when filtered_words > 16 × 112k = 1.79M.
+- **Doc generation agents** each read only 3-4 docs they need (all <100k combined).
+- Full strategy details: `.claude/instructions/file-scan.md`
+
+### Project Coverage Validation
+
+Agent counts derived from word-based formula: `deep_agents = ceil(words / 112,000)`
+
+| Example-Project | Files | Words | Scale | Scan Path | Deep Agents (from words) | Total |
+|---------|-------|-------|-------|-----------|--------------------------|-------|
+| project-titan | ~10,000 | ~3.1M | Titan | Two-tier (16 surface → filter → ~28 deep, 2 waves) | 28 | ~50 |
+| project-colossal-heavy | ~5,800 | ~1.8M | Colossal | Two-tier (10 surface → filter → ~16 deep) | 16 | ~32 |
+| project-colossal | ~4,300 | ~1.1M | Colossal | Two-tier (7 surface → filter → ~10 deep) | 10 | ~23 |
+| project-massive-dense | ~3,300 | ~1.8M | Massive | Two-tier (6 surface → filter → ~16 deep) | 16 | ~28 |
+| project-massive-light | ~3,400 | ~387k | Massive | Two-tier (6 surface → filter → ~4 deep) | 4 | ~16 |
+| project-xlarge | ~1,800 | ~623k | XLarge | Deep-only (ceil(623k/112k) = 6 agents) | 6 | ~12 |
+| project-large | ~590 | ~184k | Large | Deep-only (ceil(184k/112k) = 2 agents) | 2 | ~8 |
+| project-medium | ~245 | ~34k | Medium | Deep-only (ceil(34k/112k) = 2 min) | 2 | ~8 |
+| project-micro | ~31 | ~33k | Micro | Main reads all | 0 | ~6 |
 
 ---
 
 ## Fallback Behavior
 
-- **If Workflow tool is unavailable:** Fall back to `/init` (the natural-language version works identically, just less deterministically).
-- **If Phase 2 workflow returns partial results:** Inspect `agentStats` — if some agents returned null, manually read the missing file chunks.
-- **If Phase 4 workflow has failed agents:** Generate the specific failed doc(s) directly in the main context.
-- **If the session disconnects mid-workflow:** The workflow's `runId` allows resume. Call `Workflow({scriptPath: "...", resumeFromRunId: "wf_..."})` — completed agents return cached results instantly.
-
----
-
-## File References
-
-| File | Purpose |
-|------|---------|
-| `.claude/commands/init-pro.md` | This file — orchestration instructions for Claude |
-| `.claude/workflows/init-phase2-scan.js` | Phase 2 deterministic scan workflow |
-| `.claude/workflows/init-phase4-docs.js` | Phase 4 deterministic doc generation workflow |
-| `.claude/instructions/file-scan.md` | Strategy documentation (constants, filter rules, word-budget math) |
-| `.claude/commands/init.md` | Original natural-language version (still valid for all scales) |
+- **If an agent fails or returns incomplete data:** The main agent reads the missing files directly and fills the gap. The parallel architecture is additive — falling back to sequential never loses functionality.
+- **If the project is Micro/Small (≤149 files):** Skip Phase 2 entirely. Main agent reads all files directly (they fit in 200k). Phase 4 parallelization still applies for doc generation.
+- **If context compaction triggers during Phase 3:** This is expected for XLarge+ projects. The agent reports from Phase 2 are already structured summaries — compaction of the raw reports is acceptable because the key data (dependency edges, events, interfaces) is tabular and survives summarization well.
+- **If a surface agent fails (Two-Tier only):** Main agent re-reads that chunk's files with surface-level extraction directly. Slower but functional.
+- **If filtered_words > 1.79M (needs >16 deep agents):** Run deep scan in sequential waves (16 agents per wave, each getting ≤112k words). See `file-scan.md` for multi-wave details.
+- **If per-agent token budget still exceeds 150k after filtering:** Tighten the filter — drop "Conditional" category entirely and deep-scan only "Must" + "Should" files. The conditionally-skipped files still appear in docs via their surface metadata.
+- **If total agents would exceed 60:** The project is at the extreme end (Titan). Cap deep waves at 2 (32 deep agents max). If still insufficient, accept slightly reduced per-file attention quality by increasing word budget to 130k/agent.
+- **Surface metadata for skipped files:** Files that don't get deep-scanned still appear in ARCHITECTURE.md, PhaseMap.md, and CoverageMap.md using their surface metadata (class name, type, base class, interfaces, line count). This ensures 100% coverage without 100% deep reads.
