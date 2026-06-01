@@ -8,7 +8,6 @@
 > **Universal skills** (`unity-input`, `unity-scene-setup`, `unity-testing`, `unity-prefab-hierarchy`) apply to ALL projects and are omitted from the table below.
 
 ---
-
 ## Projects
 
 | Project | .cs Count | Words | Scale | Genre(s) | Status | Applicable Skills |
