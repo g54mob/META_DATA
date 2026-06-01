@@ -10,25 +10,38 @@ This command uses **parallel subagents** to analyze source code faster and with 
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 1: Setup (sequential — main agent)                            │
 │   Ask project → verify source → read .stub → create folders        │
+│   Determine scale → select scan path (A/B/C)                       │
 └─────────────────────────┬───────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 2: Parallel Source Scan (fan-out — multiple agents)           │
-│   Chunk .cs files into groups of ~80-120 files                      │
-│   Each agent: reads its chunk, extracts metadata per file           │
-│   Returns: structured data (classes, deps, events, interfaces)      │
+│                                                                     │
+│   PATH A (≤149 files): Main reads all directly — skip agents        │
+│                                                                     │
+│   PATH B (150-1999 files): Deep-only scan                           │
+│     Chunk into groups of ~80-150 → 2-12 deep agents                │
+│     Each: full structural extraction (deps, events, interfaces)     │
+│                                                                     │
+│   PATH C (2000+ files): Two-tier scan                               │
+│     Step 1: Surface scan (4-16 agents, 400-700 files each)          │
+│       → metadata only (signatures, types, inheritance)              │
+│     Step 2: Filter (main agent) → classify → drop 50-70% trivial   │
+│     Step 3: Deep scan (8-32 agents, filtered files only)            │
+│       → full structural extraction on significant files             │
+│     (Multi-wave if filtered > 1920 files)                           │
 └─────────────────────────┬───────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
 │ PHASE 3: Synthesis (sequential — main agent)                        │
-│   Merge all agent results → build full dependency graph             │
+│   Merge deep results + surface metadata for skipped files           │
+│   Build full dependency graph                                       │
 │   Generate ARCHITECTURE.md (requires full picture)                  │
 │   Generate PhaseMap.md (requires ARCHITECTURE)                      │
 │   Generate StructureMap.md (requires PhaseMap)                      │
 └─────────────────────────┬───────────────────────────────────────────┘
                           ▼
 ┌─────────────────────────────────────────────────────────────────────┐
-│ PHASE 4: Parallel Doc Generation (fan-out — multiple agents)        │
+│ PHASE 4: Parallel Doc Generation (fan-out — 6 agents)               │
 │   Agent A: GOAL.md (from template + PhaseMap)                       │
 │   Agent B: NewAgent.md (from template + PhaseMap)                   │
 │   Agent C: Estimate.md + SystemPortabilityMap.md                    │
@@ -70,15 +83,22 @@ This command uses **parallel subagents** to analyze source code faster and with 
    - Which contains engine/third-party DLLs (skip these)
    - Locate the game code folder: `MAIN-SOURCE/{PROJECT}/Scripts/Assembly-CSharp/` (or equivalent)
 
-6. **Enumerate all `.cs` files** in the game code folder using Glob. Count them. Determine scale:
-    | Scale | File Count | Architecture Approach |
-    |-------|-----------|----------------------|
-    | Micro | <50 | 2-3 phases max, minimal sub-systems, single DataService per domain, skip SystemIsolationAnalysis |
-    | Small | 50-149 | 3-5 phases, standard _-Systems/ approach, full docs |
-    | Medium | 150-399 | 5-8 phases, full architecture, all docs mandatory |
-    | Large | 400-799 | 8-12 phases, aggressive splitting, full docs + Phase Dependency DAG |
-    | XLarge | 800-1999 | 10-15 phases, sub-phase strategy, domain boundary splits |
-    | Massive | 2000+ | 12-20+ phases, sub-phase numbering (C-1, C-2), dedicated domain boundaries |
+6. **Enumerate all `.cs` files** in the game code folder using Glob. Count them AND estimate total words (sample 10 files, average words/file × count). Determine scale:
+    | Scale | File Count | Words | Architecture Approach |
+    |-------|-----------|-------|----------------------|
+    | Micro | <50 | <50k | 2-3 phases max, minimal sub-systems, single DataService per domain, skip SystemIsolationAnalysis |
+    | Small | 50-149 | 50k-150k | 3-5 phases, standard _-Systems/ approach, full docs |
+    | Medium | 150-399 | 150k-400k | 5-8 phases, full architecture, all docs mandatory |
+    | Large | 400-799 | 400k-800k | 8-12 phases, aggressive splitting, full docs + Phase Dependency DAG |
+    | XLarge | 800-1999 | 800k-1.5M | 10-15 phases, sub-phase strategy, domain boundary splits |
+    | Massive | 2000-3999 | 1.5M-2.5M | 12-20+ phases, sub-phase numbering (C-1, C-2), dedicated domain boundaries |
+    | Colossal | 4000-6999 | 2.5M-4M | 15-25 phases, domain partitioning, aggressive filtering |
+    | Titan | 7000+ | 4M+ | 20-30+ phases, strict domain partitioning, maximum filtering |
+
+6b. **Determine scan strategy** — reference `.claude/instructions/file-scan.md` for full details:
+    - **Micro/Small (≤149 files):** No fan-out. Main agent reads all directly.
+    - **Medium through XLarge (150-1999 files):** Deep-scan-only (original strategy).
+    - **Massive/Colossal/Titan (2000+ files OR >1.5M words):** Two-tier scan (surface → filter → deep).
 
 ---
 
@@ -86,18 +106,67 @@ This command uses **parallel subagents** to analyze source code faster and with 
 
 **Goal:** Read every `.cs` file and extract structured metadata. Distribute the work across parallel agents so each agent has a manageable context load.
 
-### Chunking Strategy
+**IMPORTANT:** Read `.claude/instructions/file-scan.md` for the complete two-tier scan strategy, prompt templates, filter rules, and fallback behaviors. The instructions below are the execution steps.
 
-7. **Divide all `.cs` file paths into chunks:**
-   - **Micro/Small (≤149 files):** Skip fan-out. Main agent reads all files directly (fits in 200k). Jump to Phase 3 step 9.
-   - **Medium (150-399):** 2-3 chunks of ~80-130 files each → 2-3 parallel agents
-   - **Large (400-799):** 4-6 chunks of ~80-130 files each → 4-6 parallel agents
-   - **XLarge (800-1999):** 8-12 chunks of ~100-150 files each → 8-12 parallel agents
-   - **Massive (2000+):** 12-16 chunks of ~120-180 files each → 12-16 parallel agents (cap at 16)
+### Scan Path Selection
 
-   **Chunk assignment strategy:** Sort files by folder path, then chunk sequentially. This keeps related files (same namespace/folder) together in the same agent, improving that agent's ability to see local relationships.
+7. **Select scan path based on scale:**
 
-8. **Launch parallel Agent calls** — one per chunk. Each agent gets this prompt:
+   **PATH A — Direct Read (Micro/Small, ≤149 files):**
+   Skip fan-out. Main agent reads all files directly (fits in 200k). Jump to Phase 3 step 9.
+
+   **PATH B — Deep-Only Scan (Medium/Large/XLarge, 150-1999 files):**
+   Standard chunked deep scan. Jump to step 8-DEEP.
+
+   **PATH C — Two-Tier Scan (Massive/Colossal/Titan, 2000+ files):**
+   Surface scan first, then filtered deep scan. Jump to step 8-SURFACE.
+
+---
+
+### PATH C: Two-Tier Scan (Massive/Colossal/Titan)
+
+> Full strategy, prompt templates, filter rules, and word-budget math are in `.claude/instructions/file-scan.md`. Steps below are the execution sequence.
+
+8-SURFACE. **Launch Surface Scan agents** — lightweight metadata extraction of ALL files:
+
+   **Chunking:** File-count-based (exception — surface agents skip method bodies so input words are negligible; the constraint is output catalog length). Formula from `file-scan.md`: `ceil(file_count / 600)` agents (capped at 16), sorted by folder path. Each agent extracts metadata only (no method bodies).
+
+   **Prompt:** Use the Surface Agent Prompt Template from `file-scan.md`.
+
+8-FILTER. **Merge surface results and classify** (main agent, sequential):
+
+   1. Combine all surface catalogs → single merged Classification Catalog.
+   2. Apply filter rules from `file-scan.md` (Must/Should/Conditional/Skip) → produce filtered file list.
+   3. Estimate filtered words: `sum(file.line_count × 8)` for all files passing filter.
+   4. Compute deep agent count: `min(16, ceil(filtered_words / 112,000))`.
+   5. Validate per-agent token budget: `filtered_words / agent_count × 1.33 < 150,000`.
+   6. **Build chunked file lists for deep agents:** Sort filtered files by folder path, walk the list accumulating words per chunk. When a chunk reaches `filtered_words / agent_count`, emit it and start a new chunk. This produces the actual file-path lists to hand to each deep agent.
+
+8-DEEP-FILTERED. **Launch Deep Scan agents on filtered file list:**
+
+   Standard deep scan (same prompt as PATH B step 8-DEEP-LAUNCH) but ONLY on files that passed the filter. Chunk by accumulated words (≤112k words per agent), not file count.
+
+   **If more than 16 agents needed:** Run in sequential waves (wave 1: 16 agents, wave 2: remainder).
+
+   **After deep scan completes:** Merge deep scan results WITH surface metadata for skipped files.
+
+   Jump to Phase 3 step 9.
+
+---
+
+### PATH B: Deep-Only Scan (Medium/Large/XLarge)
+
+> Chunking is word-primary. See `.claude/instructions/file-scan.md` "Distribution Principle" section.
+
+8-DEEP. **Compute agent count from total words:**
+   ```
+   agents_needed = ceil(total_words / 112,000)
+   agents_to_launch = min(16, max(2, agents_needed))
+   ```
+
+   **Chunk by accumulated words:** Sort files by folder path, then walk the list accumulating words per chunk. When a chunk reaches `total_words / agents_to_launch`, emit it and start a new one. This keeps related files together while respecting the word budget per agent.
+
+8-DEEP-LAUNCH. **Launch parallel Agent calls** — one per chunk. Each agent gets this prompt:
 
    ```
    You are a source code analyzer for a Unity game project called {PROJECT}.
@@ -155,13 +224,13 @@ This command uses **parallel subagents** to analyze source code faster and with 
 
    **CRITICAL:** Each agent MUST be given the exact file paths to read (absolute paths). The main agent builds the path list from the Glob results.
 
-8b. **Wait for all scan agents to complete.** Collect all results.
+8-DEEP-WAIT. **Wait for all scan agents to complete.** Collect all results. (Applies to both PATH B and PATH C deep scan.)
 
 ---
 
 ## PHASE 3 — Synthesis (Main Agent, Sequential)
 
-The main agent now has all scan results from Phase 2. This is the critical synthesis step — it CANNOT be parallelized because each doc depends on the previous.
+The main agent now has all scan results from Phase 2 (deep scan results + surface metadata for skipped files if Two-Tier). This is the critical synthesis step — it CANNOT be parallelized because each doc depends on the previous.
 
 ### Merge & Analyze
 
@@ -174,6 +243,7 @@ The main agent now has all scan results from Phase 2. This is the critical synth
    - Combine all THIRD-PARTY USAGE → third-party dependency list
    - Combine all COLLECTIONS FOR DATASERVICE → DataService extraction candidates
    - Count total files analyzed. Cross-check against Glob count from step 6.
+   - **If Two-Tier (PATH C):** Also merge surface metadata for files that were NOT deep-scanned. These files appear in ARCHITECTURE.md as lightweight entries (class name, type, base class, line count, interfaces) rather than full breakdowns. They still get assigned to phases in PhaseMap and tracked in CoverageMap.
 
 9b. **Genre Classification** — Determine the project's primary genre(s) from source patterns:
     | Genre | Detection Signals |
@@ -603,7 +673,7 @@ Write ALL files.
     ```
 
 18. **Run completeness check** — verify ALL of these pass:
-    - [ ] ARCHITECTURE.md has ALL source files documented (cross-check file count from step 6)
+    - [ ] ARCHITECTURE.md has ALL source files documented (cross-check file count from step 6). For Two-Tier projects: deep-scanned files get full entries, surface-only files get lightweight entries (class, type, base, line count). Both categories must be present — no orphans.
     - [ ] PhaseMap covers every source file (no orphans — verify against CoverageMap)
     - [ ] PhaseMap dependency DAG has no forward references (all arrows point LEFT)
     - [ ] PhaseMap phase sizes: ALL phases ≤25 files (or justified ⚠️ at 26-30)
@@ -625,29 +695,57 @@ Write ALL files.
     **If any check fails:** Fix it directly. If a Phase 4 agent missed something, generate the missing content in the main context.
 
 19. **Output summary** to user:
-    - Total scripts found (code count)
+    - Total scripts found (code count + total words)
+    - Scale classification (Micro/Small/Medium/Large/XLarge/Massive/Colossal/Titan)
+    - Scan path used (A: direct / B: deep-only / C: two-tier)
     - Total assets found (from .stub)
     - Phases planned (count + names)
     - Systems identified (count)
     - Estimated hours
     - phase-All/ scripts created (count)
     - Docs generated (count — including GameStateSoFar.md, SystemIsolationAnalysis.md)
-    - **Agent stats:** how many scan agents used, how many doc agents used, total agent calls
+    - **Agent stats:** surface agents + deep agents + doc agents = total agent calls
+    - **If Two-Tier:** files surface-scanned, files deep-scanned, files skipped (surface-only), filter reduction %
 
 ---
 
 ## Scale-Adaptive Behavior
 
-| Scale | Phase 2 Agents | Phase 4 Agents | Total Agents | Estimated Speedup vs Sequential |
-|-------|---------------|----------------|--------------|-------------------------------|
-| Micro (<50) | 0 (main reads) | 6 | 6 | ~2x |
-| Small (50-149) | 0 (main reads) | 6 | 6 | ~2x |
-| Medium (150-399) | 2-3 | 6 | 8-9 | ~3x |
-| Large (400-799) | 4-6 | 6 | 10-12 | ~4x |
-| XLarge (800-1999) | 8-12 | 6 | 14-18 | ~5-6x |
-| Massive (2000+) | 12-16 | 6 | 18-22 | ~6-8x |
+| Scale | Words | Surface Agents | Deep Agents `ceil(w/112k)` | Doc Agents | Total Agents | Speedup |
+|-------|-------|---------------|---------------------------|------------|--------------|---------|
+| Micro (<50k) | <50k | 0 | 0 (main reads) | 6 | 6 | ~2x |
+| Small (50k-150k) | 50k-150k | 0 | 0 (main reads) | 6 | 6 | ~2x |
+| Medium (150k-400k) | 150k-400k | 0 | 2-4 | 6 | 8-10 | ~3x |
+| Large (400k-800k) | 400k-800k | 0 | 4-8 | 6 | 10-14 | ~4x |
+| XLarge (800k-1.5M) | 800k-1.5M | 0 | 8-14 | 6 | 14-20 | ~5-6x |
+| Massive (1.5M-2.5M) | 1.5M-2.5M | 4-8 | 8-16 | 6 | 18-30 | ~6-8x |
+| Colossal (2.5M-4M) | 2.5M-4M | 8-14 | 16 (1 wave) | 6 | 30-36 | ~8-10x |
+| Titan (4M+) | 4M+ | 14-16 | 16-32 (2 waves) | 6 | 36-54 | ~10-12x |
 
-**Why this works:** Each scan agent gets 80-180 files — well within 200k context with full attention. The synthesis step (Phase 3) works from compressed metadata reports, not raw source. Doc generation agents each read only the 3-4 docs they need (all <100k combined). No single agent exceeds its context budget.
+**Why this works:**
+- **Distribution is word-primary** — agents are sized by total words (≤112k words = ≤150k tokens per agent), not file count. This prevents both context overflow (too many heavy files) and waste (too many tiny files per agent).
+- **Surface agents** extract metadata only (~30-50 output words/file) — trivially within budget even at 600 files/agent.
+- **Deep agents** get ≤112k words of source each (architecturally significant files only) — full focused attention within 200k context.
+- **The filter step** (between surface and deep) eliminates 50-70% of files that don't need full analysis. Their surface metadata still flows into Phase 3.
+- **Multi-wave deep scan** runs sequential batches of 16 agents when filtered_words > 16 × 112k = 1.79M.
+- **Doc generation agents** each read only 3-4 docs they need (all <100k combined).
+- Full strategy details: `.claude/instructions/file-scan.md`
+
+### Project Coverage Validation
+
+Agent counts derived from word-based formula: `deep_agents = ceil(words / 112,000)`
+
+| Example-Project | Files | Words | Scale | Scan Path | Deep Agents (from words) | Total |
+|---------|-------|-------|-------|-----------|--------------------------|-------|
+| project-titan | ~10,000 | ~3.1M | Titan | Two-tier (16 surface → filter → ~28 deep, 2 waves) | 28 | ~50 |
+| project-colossal-heavy | ~5,800 | ~1.8M | Colossal | Two-tier (10 surface → filter → ~16 deep) | 16 | ~32 |
+| project-colossal | ~4,300 | ~1.1M | Colossal | Two-tier (7 surface → filter → ~10 deep) | 10 | ~23 |
+| project-massive-dense | ~3,300 | ~1.8M | Massive | Two-tier (6 surface → filter → ~16 deep) | 16 | ~28 |
+| project-massive-light | ~3,400 | ~387k | Massive | Two-tier (6 surface → filter → ~4 deep) | 4 | ~16 |
+| project-xlarge | ~1,800 | ~623k | XLarge | Deep-only (ceil(623k/112k) = 6 agents) | 6 | ~12 |
+| project-large | ~590 | ~184k | Large | Deep-only (ceil(184k/112k) = 2 agents) | 2 | ~8 |
+| project-medium | ~245 | ~34k | Medium | Deep-only (ceil(34k/112k) = 2 min) | 2 | ~8 |
+| project-micro | ~31 | ~33k | Micro | Main reads all | 0 | ~6 |
 
 ---
 
@@ -655,4 +753,9 @@ Write ALL files.
 
 - **If an agent fails or returns incomplete data:** The main agent reads the missing files directly and fills the gap. The parallel architecture is additive — falling back to sequential never loses functionality.
 - **If the project is Micro/Small (≤149 files):** Skip Phase 2 entirely. Main agent reads all files directly (they fit in 200k). Phase 4 parallelization still applies for doc generation.
-- **If context compaction triggers during Phase 3:** This is expected for XLarge/Massive projects. The agent reports from Phase 2 are already structured summaries — compaction of the raw reports is acceptable because the key data (dependency edges, events, interfaces) is tabular and survives summarization well.
+- **If context compaction triggers during Phase 3:** This is expected for XLarge+ projects. The agent reports from Phase 2 are already structured summaries — compaction of the raw reports is acceptable because the key data (dependency edges, events, interfaces) is tabular and survives summarization well.
+- **If a surface agent fails (Two-Tier only):** Main agent re-reads that chunk's files with surface-level extraction directly. Slower but functional.
+- **If filtered_words > 1.79M (needs >16 deep agents):** Run deep scan in sequential waves (16 agents per wave, each getting ≤112k words). See `file-scan.md` for multi-wave details.
+- **If per-agent token budget still exceeds 150k after filtering:** Tighten the filter — drop "Conditional" category entirely and deep-scan only "Must" + "Should" files. The conditionally-skipped files still appear in docs via their surface metadata.
+- **If total agents would exceed 60:** The project is at the extreme end (Titan). Cap deep waves at 2 (32 deep agents max). If still insufficient, accept slightly reduced per-file attention quality by increasing word budget to 130k/agent.
+- **Surface metadata for skipped files:** Files that don't get deep-scanned still appear in ARCHITECTURE.md, PhaseMap.md, and CoverageMap.md using their surface metadata (class name, type, base class, interfaces, line count). This ensures 100% coverage without 100% deep reads.

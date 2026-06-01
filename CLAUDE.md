@@ -24,6 +24,7 @@ ROOT/
 ├── .claude/
 │   ├── commands/
 │   │   ├── init.md                   ← /init — bootstrap docs from raw source
+│   │   ├── init-pro.md               ← /init-pro — workflow-powered /init (CLI-only, deterministic)
 │   │   ├── build-phase.md            ← /build-phase — generate one phase
 │   │   ├── audit-phase.md            ← /audit-phase — post-delivery audit
 │   │   ├── source-fidelity-check.md  ← /source-fidelity-check — deep source analysis (ask mode)
@@ -80,7 +81,11 @@ ROOT/
 │   │   ├── GameStateSoFar-template.md ← progressive gameplay state guide format
 │   │   └── surfer-template.md        ← reasoning log format
 │   ├── instructions/
-│   │   └── csharp-conventions.md     ← C# rules (auto-applied to *.cs)
+│   │   ├── csharp-conventions.md     ← C# rules (auto-applied to *.cs)
+│   │   └── file-scan.md             ← two-tier scan strategy (surface + deep) for /init
+│   ├── workflows/
+│   │   ├── init-phase2-scan.js       ← deterministic Phase 2 scan (used by /init-pro)
+│   │   └── init-phase4-docs.js       ← deterministic Phase 4 doc gen (used by /init-pro)
 │   ├── WORKSPACE-REG.md              ← project registry (quick-lookup ONLY — for real work read MAIN-SOURCE/)
 │   ├── MANUAL.md                     ← user reference for slash commands
 │   └── ROADMAP.md                    ← framework maturity & future plans
@@ -165,6 +170,7 @@ Non-code domain knowledge is packaged as skills in `.claude/skills/`. Commands r
 | Command | Purpose | Frequency |
 |---------|---------|-----------|
 | `/init` | Bootstrap all docs from raw source | Once per project |
+| `/init-pro` | Workflow-powered /init (deterministic, CLI-only) | Once per project (Massive+) |
 | `/build-phase` | Generate one phase (scripts + docs) | Once per phase |
 | `/audit-phase` | Post-delivery self-audit | Auto after /build-phase |
 | `/source-fidelity-check` | Deep source analysis (ask mode) | As needed |
