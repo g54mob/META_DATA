@@ -108,7 +108,7 @@ The orchestration follows a strict dependency DAG:
    Skip workflow. Main agent reads all files directly (fits in 200k). Jump to Phase 3 step 9.
 
    **PATH B or C — Use Workflow:**
-   Build the args object and invoke the workflow.
+   Build the args object and invoke the workflow. **First, create the `LEARN/{PROJECT}/_scan/` directory** (e.g. `mkdir -p LEARN/{PROJECT}/_scan`) — workflow agents will write scan results there.
 
    **HOW TO BUILD THE FILE LIST:**
    1. Use the **Glob tool** with pattern `**/*.cs` in the game code folder — it returns all paths directly into your context.
@@ -159,6 +159,7 @@ The orchestration follows a strict dependency DAG:
 | Word-budget per agent | Claude approximates | **Validated** — JS asserts < 150k tokens |
 | Multi-wave | Claude might forget wave 2 | **Automatic** — JS loop |
 | Filter output | Free-text | **JSON schema** validated |
+| Context pressure | Scan text held in main loop (99%) | **File-based** — main loop stays <30% |
 | Resume on failure | Re-run from scratch | **`resumeFromRunId`** replays cached agents |
 
 ### Error handling:
@@ -195,7 +196,9 @@ Scan results are on disk at `LEARN/{PROJECT}/_scan/`. The main loop stays lean �
 
    **IMPORTANT:** Do NOT read the scan files yourself. Spawn the agent and let IT read them. Your context stays lean — you only track file paths and metadata.
 
-9b. **Genre Classification** — Determine the project's primary genre(s) from source patterns:
+   The ARCHITECTURE agent should ALSO perform genre classification and skill selection as part of its analysis (steps 9b and 9c below) and include the results in a `## Genre & Skills` section at the top of ARCHITECTURE.md.
+
+9b. **Genre Classification** — The ARCHITECTURE agent determines the project's primary genre(s) from source patterns:
     | Genre | Detection Signals |
     |-------|------------------|
     | Mining/Factory | OreType, Conveyor, Smelter, Belt, Recipe |
@@ -540,9 +543,9 @@ Agent counts derived from word-based formula: `deep_agents = ceil(words / 112,00
 
 - **If an agent fails or returns incomplete data:** The main agent reads the missing files directly and fills the gap. The parallel architecture is additive — falling back to sequential never loses functionality.
 - **If the project is Micro/Small (≤149 files):** Skip Phase 2 entirely. Main agent reads all files directly (they fit in 200k). Phase 4 parallelization still applies for doc generation.
-- **If context compaction triggers during Phase 3:** This is expected for XLarge+ projects. The agent reports from Phase 2 are already structured summaries — compaction of the raw reports is acceptable because the key data (dependency edges, events, interfaces) is tabular and survives summarization well.
+- **If context compaction triggers during Phase 3:** Unlikely with file-based handoff (main loop stays <30%), but if it happens: the main loop only holds file paths and metadata, so compaction loses nothing critical. Background agents have their own fresh contexts reading from disk.
 - **If a surface agent fails (Two-Tier only):** Main agent re-reads that chunk's files with surface-level extraction directly. Slower but functional.
 - **If filtered_words > 1.79M (needs >16 deep agents):** Run deep scan in sequential waves (16 agents per wave, each getting ≤112k words). See `file-scan.md` for multi-wave details.
 - **If per-agent token budget still exceeds 150k after filtering:** Tighten the filter — drop "Conditional" category entirely and deep-scan only "Must" + "Should" files. The conditionally-skipped files still appear in docs via their surface metadata.
 - **If total agents would exceed 60:** The project is at the extreme end (Titan). Cap deep waves at 2 (32 deep agents max). If still insufficient, accept slightly reduced per-file attention quality by increasing word budget to 130k/agent.
-- **Surface metadata for skipped files:** Files that don't get deep-scanned still appear in ARCHITECTURE.md, PhaseMap.md, and CoverageMap.md using their surface metadata (class name, type, base class, interfaces, line count). This ensures 100% coverage without 100% deep reads.
+- **Surface metadata for skipped files:** Files that don't get deep-scanned still appear in ARCHITECTURE.md, PhaseMap.md, and CoverageMap.md using their surface metadata from `_scan/surface-merged.md` (class name, type, base class, interfaces, line count). This ensures 100% coverage without 100% deep reads.

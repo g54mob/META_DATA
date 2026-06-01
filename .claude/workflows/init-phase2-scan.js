@@ -155,7 +155,7 @@ const FILTER_SCHEMA = {
     },
     surfaceMetadata: {
       type: 'string',
-      description: 'The full merged surface catalog text for ALL files (both deep-scan candidates and skipped) — to be passed to Phase 3 for lightweight entries'
+      description: 'Confirmation note that merged surface catalog was written to disk (e.g. "Written to LEARN/project/_scan/surface-merged.md")'
     },
     stats: {
       type: 'object',
