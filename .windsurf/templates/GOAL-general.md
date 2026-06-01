@@ -2577,7 +2577,7 @@ public static class SO_ItemDefExt                                    // co-locat
 
 **Generalized rule:** Extension classes can be co-located in the same file as ANY class — not just SO_. For example, `MoneyExtension` in the same file as `EconomyManager`. Use `#region extension` to wrap them. The pattern works whenever helper methods would clutter the main class.
 
-### 10 Common Pitfalls
+### 13 Common Pitfalls
 
 1. **SetActive cascading** — parent disables ALL children. Siblings, not children, for independent panels.
 2. **Scene instance vs prefab** — drag from Hierarchy, not Project panel.

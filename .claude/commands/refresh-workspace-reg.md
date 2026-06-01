@@ -2,133 +2,202 @@
 description: "Regenerate WORKSPACE-REG.md from actual MAIN-SOURCE/ contents — rescan all projects, recount .cs files, reclassify scale/genre/skills, update demand matrix. Use when: new projects added, after /init confirms genres, after skill list changes, registry feels stale"
 ---
 
-## Setup
+# /refresh-workspace-reg — Agentic Workspace Registry Refresh
 
-No user input required — this prompt scans the entire workspace.
+This command uses **parallel subagents** to scan all projects concurrently. Each project is independent — perfect for fan-out. The orchestration follows this DAG:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 1: Setup (sequential — main agent)                            │
+│   Read current registry → list MAIN-SOURCE/ → count projects        │
+│   Determine chunk count → assign projects to agents                 │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 2: Parallel Project Scan (fan-out — multiple agents)          │
+│   Each agent gets ~5-10 projects to scan                            │
+│   Extracts: .cs count, word count, class breakdown, assets,         │
+│             genre, skills, status — for each assigned project        │
+│   Returns: structured report per project                            │
+└─────────────────────────┬───────────────────────────────────────────┘
+                          ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ PHASE 3: Synthesis (sequential — main agent)                        │
+│   Merge all agent reports → build tables → classify scale           │
+│   Build genre clusters → rebuild demand matrix                      │
+│   Write WORKSPACE-REG.md → validate                                 │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## PHASE 1 — Setup (Main Agent, Sequential)
 
 **In-depth detailed analysis is MANDATORY.** Scan every project folder in MAIN-SOURCE/. Count actual files. Classify from real folder/file names. Do NOT guess.
 
-## Context Load
-
-1. Read `.claude/WORKSPACE-REG.md` — current registry (preserve any manually-set Status values)
+1. Read `WORKSPACE-REG.md` — current registry (preserve any manually-set Status values)
 2. Read `CLAUDE.md` — current skill list (Skills table) for valid skill names
 3. List `MAIN-SOURCE/` — get every project folder (ignore `.stub` files, `file-size.js`, `pathHierarchy.js`, `gitignore-gen.js`)
 4. **Immediately count** the project folder list and record as `TOTAL_PROJECTS`. Verify with `| wc -l`. This number must match all table row counts later.
-5. For each project folder, list its top-level contents to determine structure (Scripts/, Assemblies/, etc.)
+5. **Determine agent count:**
+   ```
+   agents_to_launch = min(8, ceil(TOTAL_PROJECTS / 5))
+   ```
+   - ≤5 projects: 1 agent (no fan-out, main reads directly)
+   - 6-10 projects: 2 agents
+   - 11-15 projects: 3 agents
+   - 16-40 projects: 4-8 agents
+   - Chunk projects into roughly equal groups, sorted alphabetically
 
-## Phase 1 — Count .cs Files Per Project
+---
 
-6. For EACH project folder in `MAIN-SOURCE/`:
-   a. Recursively count all `.cs` files (use `find "$dir" -name "*.cs" | wc -l`)
-   b. Record the exact count — do NOT approximate
-   c. If a project has only an `Assemblies/` folder (DLLs, no raw .cs): note as "DLL-only" and estimate from DLL count × ~50
+## PHASE 2 — Parallel Project Scan (Fan-Out Agents)
 
-**Batching:** Process in batches of ~10 projects per shell command to avoid timeouts. Use a for-loop that prints `"$dir: $count"` per project. Run batches in parallel where possible.
+**Goal:** Each subagent scans its assigned projects and returns structured data for all of them. Projects are independent — no cross-project dependencies during scan.
 
-## Phase 2 — Measure Content Volume
+### If ≤5 projects: Skip fan-out
 
-7. For EACH project folder in `MAIN-SOURCE/`:
+Main agent performs all scans directly (same extraction as the agent prompt below). Jump to Phase 3.
 
-   **A. Word count (code volume):**
-   - Count total words across all `.cs` files combined: `find "$dir" -name "*.cs" -exec cat {} + | wc -w`
-   - Record as raw number (e.g., 52561, 1124520)
-   - This is the TRUE complexity metric — more important than file count
-   - **Batch** in groups of ~10 projects per command. Use 300s timeout for word-count commands.
+### If >5 projects: Fan-out
 
-   **B. Script class breakdown:**
-   - Use `grep -rl` (files containing pattern) within each project to count:
-     - **MonoBehaviours:** files matching `: MonoBehaviour` OR `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks`
-     - **NetworkBehaviours:** files matching `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks` (subset of MB count)
-     - **ScriptableObjects:** files matching `: ScriptableObject`
-     - **Interfaces:** files containing `interface ` declarations (grep for `"^\s*\(public \|internal \|private \|\)interface "`)
-     - **Other Classes:** calculated as `(.cs file count) - (MonoBehaviours + ScriptableObjects + Interfaces)`. This is an approximation since some files contain multiple types or only enums/structs, but sufficient for registry purposes.
-   - **Batch** in groups of ~10 projects per command.
+6. **Fan-out** — launch one Agent per chunk in parallel. Each agent gets this prompt:
 
-   **C. Asset counts (from .stub files or project folders):**
-   - For sprites/textures: `grep -ci "\.png\|\.jpg\|\.psd\|\.tga" "entire-{project}.stub"`
-     - NOTE: This counts lines containing these extensions — includes `.meta` references. Accept as approximate.
-   - For 3D models: count actual files in project folder with `find "$dir" -name "*.fbx" -o -name "*.obj" -o -name "*.blend" | wc -l`
-   - For animation clips: count actual files with `find "$dir" -name "*.anim" | wc -l`
-   - For animator controllers: count actual files with `find "$dir" -name "*.controller" | wc -l`
-   - If neither project folder nor stub has data, mark as "N/A"
-   - **Prefer actual file counts** from project folders over stub grep when both exist. Fall back to stub only for sprites (which are typically stripped from source folders but listed in stubs).
+```
+You are a workspace scanner for a Unity game rebuild workspace.
 
-## Phase 3 — Classify Scale
+Your job: For each assigned project in MAIN-SOURCE/, extract structured metadata.
+Return your results as a structured report — one section per project.
+
+## Your assigned projects (scan ALL of them):
+{LIST_OF_PROJECT_FOLDER_NAMES}
+
+## For EACH project, extract and report:
+
+### {project_name}
+
+**A. File counts:**
+- Total .cs files: recursively count all `.cs` files in the project folder
+- If project has only `Assemblies/` folder (DLLs, no raw .cs): note as "DLL-only" and estimate from DLL count × ~50
+
+**B. Word count:**
+- Count total words across all `.cs` files combined: `find "MAIN-SOURCE/{project}" -name "*.cs" -exec cat {} + | wc -w`
+- Record exact number
+
+**C. Script class breakdown (use grep -rl within the project):**
+- MonoBehaviours: files matching `: MonoBehaviour` OR `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks`
+- NetworkBehaviours: files matching `: NetworkBehaviour` OR `: MonoBehaviourPun` OR `: MonoBehaviourPunCallbacks` (subset)
+- ScriptableObjects: files matching `: ScriptableObject`
+- Interfaces: files containing `interface ` declarations
+- Other Classes: (.cs count) - (MonoBehaviours + ScriptableObjects + Interfaces)
+
+**D. Asset counts:**
+- Sprites/textures: `grep -ci "\.png\|\.jpg\|\.psd\|\.tga" "MAIN-SOURCE/entire-{project}.stub"` (if stub exists)
+- 3D models: `find "MAIN-SOURCE/{project}" -name "*.fbx" -o -name "*.obj" -o -name "*.blend" | wc -l`
+- Animation clips: `find "MAIN-SOURCE/{project}" -name "*.anim" | wc -l`
+- Animator controllers: `find "MAIN-SOURCE/{project}" -name "*.controller" | wc -l`
+- Prefer actual file counts over stub grep. Fall back to stub only for sprites.
+
+**E. Genre classification (order of trust):**
+1. If `LEARN/{project}/ARCHITECTURE.md` or `GOAL.md` exists → read genre from there (authoritative)
+2. Explore `Scripts/Assembly-CSharp/` subfolders for domain folders (Combat/, Building/, etc.)
+3. Search for genre-signal filenames: `find "$dir" -name "*.cs" | grep -i "keyword"` with: farm, tower, idle, horror, card, physics, build, craft, quest, vehicle, tycoon, colony, puzzle, etc.
+4. Class name patterns from file listings (*Tycoon*, *Horror*, *Tower*, *Card*)
+
+**F. Skill detection (require 2+ signals OR 1 strong match):**
+| Signal | Skill |
+|--------|-------|
+| NavMesh*, AI*, Patrol*, NPC*; AstarPathfindingProject assembly | `unity-ai-navigation` |
+| Anim*, Animator*, Spine*, DOTween assembly | `unity-animation` |
+| Audio*, Sound*, Music*, FMOD* assembly | `unity-audio` |
+| Camera*, Cinemachine assembly*, FreeLook* | `unity-camera` |
+| DayNight*, TimeOfDay*, Sun*, LightCycle* | `unity-day-night` |
+| Dialogue*, Yarn*, Ink*, Conversation* | `unity-dialogue` |
+| State*, FSM*, IState*; Animancer.FSM assembly | `unity-fsm` |
+| Grid*, Build*, Place*, Tile*, Snap* (building context) | `unity-grid-building` |
+| Inventory*, Item*, Slot*, Hotbar*, Equipment* | `unity-inventory` |
+| Photon*, Mirror*, FishNet*, Netcode*; NetworkBehaviour count > 0 | `unity-networking` |
+| Rigidbody*, Joint*, Ragdoll*, Physics*, Force* | `unity-physics` |
+| Procedural*, Perlin*, Chunk*, WorldGen*, Seed* | `unity-procedural-gen` |
+| Quest*, Objective*, Journal* | `unity-quest` |
+| Save*, Load*, ISaveable*, Persist*; EasySave assembly | `unity-save-load` |
+
+Universal skills (unity-input, unity-scene-setup, unity-testing, unity-prefab-hierarchy) apply to ALL — don't list them per project.
+
+**G. Status (check LEARN/{project}/ existence):**
+- No LEARN folder → `Not started`
+- Has ARCHITECTURE.md/GOAL.md but no `phase-{x}` folders → `Init'd`
+- Has `phase-{x}` folders → count them → `Phase {highest} in progress`
+- All phases from PhaseMap.md complete → `Complete`
+
+## Output format per project:
+
+```
+### {project_name}
+- .cs count: {N}
+- Words: {N}
+- MonoBehaviours: {N}
+- NetworkBehaviours: {N}
+- ScriptableObjects: {N}
+- Interfaces: {N}
+- Other: {N}
+- Sprites/Textures: {N}
+- 3D Models: {N}
+- Anim Clips: {N}
+- Animator Controllers: {N}
+- Genre: {genre_label}
+- Skills: {comma-separated list}
+- Status: {status}
+```
+
+Be thorough. Use ACTUAL file counts from shell commands — do NOT guess or estimate.
+Use 300s timeout for word-count commands on large projects.
+```
+
+7. **Barrier** — wait for ALL scan subagents to complete. Collect all results.
+
+---
+
+## PHASE 3 — Synthesis (Main Agent, Sequential)
+
+The main agent now has all scan results from Phase 2.
+
+### Classify Scale
 
 8. Apply scale tiers from actual .cs count:
-   | Scale | Range |
-   |-------|-------|
-   | Micro | < 50 |
-   | Small | 50–149 |
-   | Medium | 150–399 |
-   | Large | 400–799 |
-   | XLarge | 800–1999 |
-   | Massive | 2000+ |
+   | Scale | File Count | Words |
+   |-------|-----------|-------|
+   | Micro | <50 | <50k |
+   | Small | 50–149 | 50k-150k |
+   | Medium | 150–399 | 150k-400k |
+   | Large | 400–799 | 400k-800k |
+   | XLarge | 800–1999 | 800k-1.5M |
+   | Massive | 2000-3999 | 1.5M-2.5M |
+   | Colossal | 4000-6999 | 2.5M-4M |
+   | Titan | 7000+ | 4M+ |
 
    After classifying, **verify:** sum of all tier counts MUST equal `TOTAL_PROJECTS`.
 
-## Phase 4 — Classify Genre
+### Build Genre Clusters
 
-9. For each project, determine genre(s) from:
-   - **Primary source:** If `LEARN/{project}/ARCHITECTURE.md` or `GOAL.md` exists, read genre from there (authoritative)
-   - **Secondary source:** Explore `Scripts/Assembly-CSharp/` subfolders — these contain the actual game code organized by domain (e.g., `Combat/`, `Building/`, `Cartel/`, `FactoryFloor/`, `Battle/`)
-   - **Tertiary source:** Search for genre-signal filenames: `find "$dir" -name "*.cs" | grep -i "keyword"` with keywords like farm, tower, idle, horror, card, physics, build, craft, quest, vehicle, etc.
-   - **Last resort:** Class name patterns from file listings (e.g., `*Tycoon*`, `*Horror*`, `*Tower*`, `*Card*`)
+9. Group projects by primary genre into clusters:
+   a. For each distinct genre, list all projects that belong to it
+   b. A project may appear in multiple clusters if it has strong dual-genre identity (e.g., Horror + Co-op)
+   c. Sort clusters by count (highest first), then alphabetical for ties
+   d. Use short genre labels: "Horror", "Tycoon / Management", "Idle / Incremental", "Factory / Automation", "Physics Sandbox / Combat", "Colony Sim / Strategy", "Card / Strategy", "City / Building Sim", "Action / RPG", "Tower Defense", "Engineering Puzzle", "Narrative / Mystery", "Co-op Multiplayer", etc.
+   e. Merge genres with only 1 project into a broader category where sensible — avoid single-project clusters unless the genre is truly unique
 
-   Genre classification order of trust: LEARN/ docs > subfolder structure > filename patterns > class name guesses
+### Rebuild Demand Matrix
 
-## Phase 5 — Determine Applicable Skills
-
-10. For each project, determine which skills apply by scanning for evidence:
-    | Signal | Skill |
-    |--------|-------|
-    | NavMesh*, AI*, Patrol*, NPC* folders/classes; AstarPathfindingProject assembly | `unity-ai-navigation` |
-    | Anim*, Animator*, Spine*, DOTween assembly; animation-heavy folders | `unity-animation` |
-    | Audio*, Sound*, Music*, FMOD* assembly; AudioManager class | `unity-audio` |
-    | Camera*, Cinemachine assembly*, FreeLook* | `unity-camera` |
-    | DayNight*, TimeOfDay*, Sun*, LightCycle*, DayNightFader | `unity-day-night` |
-    | Dialogue*, Yarn*, Ink*, Conversation*; YarnSpinner/PixelCrushers assembly | `unity-dialogue` |
-    | State*, FSM*, IState*; Animancer.FSM assembly | `unity-fsm` |
-    | Grid*, Build*, Place*, Tile*, Snap*; building/placement folders | `unity-grid-building` |
-    | Inventory*, Item*, Slot*, Hotbar*, Equipment* (in inventory context) | `unity-inventory` |
-    | Photon*, Mirror*, FishNet*, Netcode*; NetworkBehaviour count > 0 | `unity-networking` |
-    | Rigidbody*, Joint*, Ragdoll*, Physics*, Force*; ActiveRagdoll folder | `unity-physics` |
-    | Procedural*, Perlin*, Chunk*, WorldGen*, Seed*; DunGen assembly | `unity-procedural-gen` |
-    | Quest*, Objective*, Journal* | `unity-quest` |
-    | Save*, Load*, ISaveable*, Persist*; EasySave assembly; SaveManager class | `unity-save-load` |
-
-    - `unity-input`, `unity-scene-setup`, `unity-testing`, `unity-prefab-hierarchy` apply to ALL projects (universal — omit from per-project column)
-    - For non-universal skills, require at least 2 signal matches OR 1 strong match (dedicated folder OR dedicated assembly)
-
-## Phase 6 — Determine Status
-
-11. For each project, check `LEARN/{project}/` existence:
-    - No LEARN folder → `Not started`
-    - Has ARCHITECTURE.md/GOAL.md but no `phase-{letter/number}` folders → `Init'd`
-    - Has `phase-{x}` folders → count them → `Phase {highest} in progress`
-    - All phases from PhaseMap.md complete → `Complete`
-    - Preserve existing manually-set status if LEARN folder state hasn't changed (don't downgrade)
-
-## Phase 7 — Build Genre Clusters
-
-12. Group projects by primary genre into clusters:
-    a. For each distinct genre, list all projects that belong to it
-    b. A project may appear in multiple clusters if it has strong dual-genre identity (e.g., Horror + Co-op)
-    c. Sort clusters by count (highest first), then alphabetical for ties
-    d. Use short genre labels: "Horror", "Tycoon / Management", "Idle / Incremental", "Factory / Automation", "Physics Sandbox / Combat", "Colony Sim / Strategy", "Card / Strategy", "City / Building Sim", "Action / RPG", "Tower Defense", "Engineering Puzzle", "Narrative / Mystery", "Co-op Multiplayer", etc.
-    e. Merge genres with only 1 project into a broader category where sensible — avoid single-project clusters unless the genre is truly unique
-
-## Phase 8 — Rebuild Demand Matrix
-
-13. After all projects classified, rebuild the Skill Demand table:
-    a. For each non-universal skill, count how many projects list it **by re-reading the completed Projects table rows**
+10. After all projects classified, rebuild the Skill Demand table:
+    a. For each non-universal skill, count how many projects list it
     b. List all project short-names that need it
     c. Sort by demand count (highest first), then alphabetical for ties
-    d. **Cross-check:** the listed project names for each skill must exactly match the projects that have that skill in their Applicable Skills column. If there's a mismatch, fix the discrepancy before writing.
+    d. **Cross-check:** the listed project names for each skill must exactly match the projects that have that skill in their scan results. If there's a mismatch, fix the discrepancy before writing.
 
-## Phase 9 — Write WORKSPACE-REG.md
+### Write WORKSPACE-REG.md
 
-14. Write `.claude/WORKSPACE-REG.md` with this exact structure:
+11. Write `WORKSPACE-REG.md` with this exact structure:
 
 ```markdown
 # Project Registry
@@ -178,7 +247,9 @@ No user input required — this prompt scans the entire workspace.
 | Medium (150-399) | ... | ... |
 | Large (400-799) | ... | ... |
 | XLarge (800-1999) | ... | ... |
-| Massive (2000+) | ... | ... |
+| Massive (2000-3999) | ... | ... |
+| Colossal (4000-6999) | ... | ... |
+| Titan (7000+) | ... | ... |
 
 ---
 
@@ -220,9 +291,9 @@ No user input required — this prompt scans the entire workspace.
 - Total workspace: {TOTAL_PROJECTS} projects, ~{total .cs files} .cs files, ~{total words}M words of source code
 ```
 
-## Validation
+### Validation
 
-15. Verify ALL of the following before considering the task complete:
+12. Verify ALL of the following before considering the task complete:
     - `TOTAL_PROJECTS` matches the actual `ls | wc -l` count from step 4
     - Every project folder in MAIN-SOURCE/ appears in the Projects table (no orphans)
     - No table entry references a project folder that doesn't exist
@@ -235,7 +306,40 @@ No user input required — this prompt scans the entire workspace.
     - Asset Counts table has an entry for every project (use "0" for none, "N/A" only when data truly unavailable)
     - No duplicate project entries in any table
 
-## Post-Refresh
+### Post-Refresh
 
-16. Update `CLAUDE.md` if project count changed (currently references project count in workspace description — update if different)
-17. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
+13. Update `CLAUDE.md` if project count changed (currently references project count in workspace description — update if different)
+14. Append to `LEARN/{any-active-project}/surfer.md` if one is in progress: `### /refresh-workspace-reg — {DATE}\n- Registry refreshed: {N} projects, {changes summary}`
+
+---
+
+## Scale-Adaptive Behavior
+
+| Project Count | Agents | Projects/Agent | Speedup |
+|---------------|--------|----------------|---------|
+| 1-5 | 0 (main reads) | — | 1x |
+| 6-10 | 2 | ~5 | ~2x |
+| 11-15 | 3 | ~5 | ~3x |
+| 16-20 | 4 | ~5 | ~3-4x |
+| 21-30 | 5-6 | ~5 | ~4-5x |
+| 31-40 | 7-8 | ~5 | ~5-6x |
+
+---
+
+## Fallback Behavior
+
+- **If an agent fails or returns incomplete data:** Main agent re-scans the missing projects directly. Parallel is additive — falling back to sequential never loses functionality.
+- **If ≤5 projects:** Skip Phase 2 entirely. Main agent scans all projects directly.
+- **If a project has no .cs files at all:** Report `.cs count: 0`, mark as "DLL-only" or "Asset-only" depending on folder contents. Still include in all tables.
+- **If word count command times out (very large project):** Use estimation: `.cs count × avg_lines × 8 words/line`. Mark as estimated in output.
+
+---
+
+## Output Summary
+
+15. Report to user:
+    - Total projects scanned
+    - Agent stats: {N} scan agents launched
+    - Projects added/removed/changed since last refresh
+    - Scale distribution (one-liner)
+    - Any discrepancies found during validation

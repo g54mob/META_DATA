@@ -13,6 +13,7 @@
 !.gitignore
 !CLAUDE.md
 !pack.js
+!WORKSPACE-REG.md
 
 # Include folders as empty (content ignored, .gitkeep tracked)
 !LEARN/

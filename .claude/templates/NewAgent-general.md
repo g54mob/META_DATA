@@ -314,7 +314,7 @@ For systems needing visual/hands-on verification:
   - Cover: initial state → primary actions → edge cases → error conditions
 - **Summary Checklist** — pass/fail items
 - **Self-contained** — no "see GUIDE.md" shortcuts. Assumes zero prior knowledge.
-- **Pitfall Checks** — every Manual/*.md must warn about applicable items from the 10 Common Pitfalls list in GOAL.md (SetActive cascading, scene vs prefab, raycastTarget, missing layers, etc.)
+- **Pitfall Checks** — every Manual/*.md must warn about applicable items from the 13 Common Pitfalls list in GOAL.md (SetActive cascading, scene vs prefab, raycastTarget, missing layers, etc.)
 
 ### Manual Test Pitfall Checklist
 

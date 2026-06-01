@@ -87,11 +87,11 @@ ROOT/
 │   │   ├── move-system.md            ← /move-system — relocate system between phases
 │   │   ├── merge-phase.md            ← /merge-phase — combine underpopulated phases
 │   │   └── refresh-workspace-reg.md  ← /refresh-workspace-reg — rescan & rebuild registry
-│   ├── WORKSPACE-REG.md              ← project registry (quick-lookup ONLY — for real work read MAIN-SOURCE/)
 │   ├── MANUAL.md                     ← user reference for slash commands
 │   └── ROADMAP.md                    ← framework maturity & future plans
 ├── .claude/                          ← Claude Code config (parallel — same content, different format)
 ├── .github/                          ← GitHub Copilot config (parallel — same content, different format)
+├── WORKSPACE-REG.md                  ← project registry (quick-lookup ONLY — for real work read MAIN-SOURCE/)
 ├── MAIN-SOURCE/
 │   ├── {project}/                    ← raw source (READ-ONLY — never modify)
 │   └── entire-{project}.stub        ← full file hierarchy including excluded assets
@@ -112,6 +112,27 @@ ROOT/
         ├── phase-All/                ← shared scripts (Singleton, GameEvents, UIManager, etc.)
         └── phase-{x}/               ← per-phase scripts + GUIDE.md + FLOW.md
 ```
+
+## Living Documents
+
+The following `LEARN/{project}/` docs are **living** — they get modified over time as the project progresses through phases, not just at `/init`:
+
+| Document | Updated By | When |
+|----------|-----------|------|
+| `PhaseMap.md` | `/post-delivery-sync`, `/add-system-to-phase`, `/move-system`, `/merge-phase`, `/refresh-learn-docs` | After each phase typed, system added/moved/merged |
+| `StructureMap.md` | `/post-delivery-sync`, `/add-system-to-phase`, `/refresh-learn-docs` | After each phase typed, DataService shape changes |
+| `SystemPortabilityMap.md` | `/audit-phase`, `/decouple-check`, `/move-system`, `/merge-phase`, `/refresh-learn-docs` | After delivery audit, coupling fixes, system moves |
+| `SystemIsolationAnalysis.md` | `/audit-phase`, `/refresh-learn-docs` | After delivery audit, interface/bridge changes |
+| `CoverageMap.md` | `/post-delivery-sync`, `/add-system-to-phase`, `/move-system`, `/merge-phase`, `/refresh-learn-docs` | After files added/moved/renamed |
+| `Estimate.md` | `/post-delivery-sync`, `/refresh-learn-docs` | After each phase typed (actuals vs estimates) |
+| `GameStateSoFar.md` | `/post-delivery-sync` | After each phase typed (what's now playable) |
+| `GOAL.md` | `/update-goal-from-handtyped` | After user types code, calibrating style section |
+| `surfer.md` | Every command | Append-only — new entry per agent prompt |
+| `OptionalFeatures.md` | `/post-delivery-sync`, `/refresh-learn-docs` | After features get implemented or integration points change |
+
+**Rule:** Never treat these as frozen after `/init`. They represent the *current* state of the project, not the initial plan.
+
+---
 
 ## Key Rules
 

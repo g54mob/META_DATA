@@ -875,7 +875,7 @@ Project uses `SPACE_UTIL` namespace. Use these instead of verbose standard API:
 | `LOG.AddLog(data, type)` | structured logging | `LOG.AddLog(snapshot, "json")` |
 | `LOG.H(name)` / `LOG.HEnd()` | log header sections | `LOG.H("MapData")` |
 
-## 10 Common Pitfalls
+## 13 Common Pitfalls
 
 1. **SetActive cascading** — parent disables ALL children. Use siblings for independent panels.
 2. **Scene instance vs prefab** — drag from Hierarchy, not Project panel.
@@ -891,7 +891,7 @@ Project uses `SPACE_UTIL` namespace. Use these instead of verbose standard API:
 12. **SaveData fields inside MonoBehaviour** — extract to separate pure C# `[Serializable]` SaveData class. MonoBehaviour implements ISaveable and returns SaveData from `GetSaveData()`.
 13. **PlayerPrefs for complex game state** — PlayerPrefs is for settings (volume, keybinds) only. Use file-based JSON for game saves.
 
-## 33 Common Agent Mistakes
+## 35 Common Agent Mistakes
 
 1. Any `FindObjectOfType` in MonoBehaviours → use `[SerializeField]`, Owner chain, or GameEvents
 2. Public methods nobody calls externally → audit every public method
@@ -926,3 +926,5 @@ Project uses `SPACE_UTIL` namespace. Use these instead of verbose standard API:
 31. Missing `// →` in "simple" constructors/methods → the rule says EVERY method body, including constructors that are just field assignments. No exceptions for "too simple"
 32. Missing `/// <summary>` on batch-generated items → when generating multiple stubs (virtual methods, enum types), each MUST get its own summary. A single block comment above the batch is NOT sufficient
 33. PhaseXLOG method names not following `LIST_`/`DOC_` prefix → method must be `LIST_X__TO__JSON` for List collections and `DOC_X_Y__TO__JSON` for Dictionary collections. Never bare `X__TO__JSON`
+34. Unnecessary MonoBehaviour inheritance → class extends MonoBehaviour but doesn't use ANY Unity feature (`[SerializeField]`, lifecycle hooks, coroutines, physics callbacks, needs to exist on a GameObject). Convert to plain C# class. MonoBehaviour is ONLY for scripts that genuinely need Unity lifecycle or scene presence. Pure C# classes (DataService, DataWrapper, entities, helpers, calculators, formatters, validators) are ALWAYS preferred
+35. File naming ≠ class naming for inspector-added MonoBehaviours → Unity 6000.3 requires filename MUST match classname for any MonoBehaviour added via Add Component menu (inspector search indexes by filename). Code-added MBs (`AddComponent<T>()`) are exempt from this rule

@@ -12,7 +12,7 @@ agent: "agent"
 ## Context Load
 
 2. Read `LEARN/{PROJECT}/GOAL.md` — architecture bible (all rules, naming, patterns, pitfalls, common mistakes)
-3. Read `LEARN/{PROJECT}/NewAgent.md` — agent instructions (first prompt, delivery checklist, mandatory patterns, common mistakes to catch). This file defines WHAT the agent must deliver and HOW to avoid the 17 most common mistakes. Do NOT skip this file.
+3. Read `LEARN/{PROJECT}/NewAgent.md` — agent instructions (first prompt, delivery checklist, mandatory patterns, common mistakes to catch). This file defines WHAT the agent must deliver and HOW to avoid the 35 most common mistakes. Do NOT skip this file.
 4. Read `LEARN/{PROJECT}/PhaseMap.md` — target phase section (file list, folder placements, _-Systems/ assignments, cross-phase mods, vertical slice tests, gap audit)
 5. Read `LEARN/{PROJECT}/StructureMap.md` — DataService specs for this phase (exact collections, methods, nested types, GetSnapShotForTest format)
 6. Read `LEARN/{PROJECT}/handTyped(latest)/` if it exists — ground truth coding style. Match this user's actual conventions: #region style, naming, extensions used, verbosity level. If it doesn't exist yet, rely on GOAL.md conventions.
@@ -87,7 +87,7 @@ Domain-specific knowledge lives in `.github/skills/`. Load the relevant skill wh
 
 16. Create `5-Tests/` — DEBUG_Check for data-level testing (new DataService → Build → mutate → LOG.AddLog(snapshot, "json")). System-specific test scripts for UI-level testing. Each test lists prerequisites, NOT required, controls, checklist.
 
-17. Create `5-Tests/Manual/*.md` for systems needing visual/hands-on verification (UI panels, animations, physics, effects). Each manual test guide is **self-contained**: prerequisites, step-by-step scene setup (every GO, component, wiring with `| Field | Drag From |` tables), DO/EXPECT steps, pass/fail checklist. Include the 10 common pitfalls relevant to this system.
+17. Create `5-Tests/Manual/*.md` for systems needing visual/hands-on verification (UI panels, animations, physics, effects). Each manual test guide is **self-contained**: prerequisites, step-by-step scene setup (every GO, component, wiring with `| Field | Drag From |` tables), DO/EXPECT steps, pass/fail checklist. Include the 13 common pitfalls relevant to this system.
 
 ## Documentation
 

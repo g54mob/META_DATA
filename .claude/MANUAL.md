@@ -69,7 +69,6 @@ ROOT/
 ├── .claude/
 │   ├── CLAUDE.md       ← always-on context (architecture summary + critical behavior)
 │   ├── Manual.md                     ← this file
-│   ├── WORKSPACE-REG.md              ← project registry (quick-lookup: scale, genre, skills, status)
 │   ├── ROADMAP.md                    ← high-level project roadmap
 │   ├── instructions/
 │   │   └── csharp-conventions.instructions.md ← C# rules (auto-applied to *.cs)
@@ -130,6 +129,7 @@ ROOT/
 │       ├── move-system.md             ← /move-system — relocate system between phases
 │       ├── merge-phase.md             ← /merge-phase — combine underpopulated phases
 │       └── refresh-workspace-reg.md   ← /refresh-workspace-reg — rescan & rebuild registry
+├── WORKSPACE-REG.md                  ← project registry (quick-lookup: scale, genre, skills, status)
 ├── MAIN-SOURCE/
 │   ├── {project}/                    ← raw source (READ-ONLY — never modify)
 │   └── entire-{project}.stub        ← full file hierarchy including excluded assets
@@ -285,8 +285,8 @@ ROOT/
 1. **Source fidelity** — every public method/field compared to original (✅/❌/⚠️)
 2. **Unlisted functionality discovery** — scans ALL source files in the domain, not just mapped ones. Classifies missed items as Critical/Important/Nice-to-have
 3. **Architecture violations** — FindObjectOfType, public methods nobody calls, missing `// purpose:`, SO_ with methods, raw string tags, raw string animator params, `!` instead of `== false`, GameEvents with concrete types, 80% rule
-4. **17 Common Agent Mistakes** — full list from NewAgent.md
-5. **10 Common Pitfalls** — SetActive cascading, layers, static lists, etc.
+4. **35 Common Agent Mistakes** — full list from C# Conventions
+5. **13 Common Pitfalls** — SetActive cascading, layers, static lists, FSM switch, SaveData in MB, etc.
 6. **DataService completeness** — every collection has LOG method + snapshot
 7. **Doc consistency** — GUIDE.md, FLOW.md, Dependency.md accuracy
 8. **Manual test quality** — "How It Works" prose for complex systems

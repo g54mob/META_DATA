@@ -10,7 +10,7 @@ No user input required — this prompt scans the entire workspace.
 
 ## Context Load
 
-1. Read `.windsurf/WORKSPACE-REG.md` — current registry (preserve any manually-set Status values)
+1. Read `WORKSPACE-REG.md` — current registry (preserve any manually-set Status values)
 2. Read `.windsurf/copilot-instructions.md` — current skill list (Skills table) for valid skill names
 3. List `MAIN-SOURCE/` — get every project folder (ignore `.stub` files, `file-size.js`, `pathHierarchy.js`, `gitignore-gen.js`)
 4. **Immediately count** the project folder list and record as `TOTAL_PROJECTS`. Verify with `| wc -l`. This number must match all table row counts later.
@@ -55,15 +55,17 @@ No user input required — this prompt scans the entire workspace.
 
 ## Phase 3 — Classify Scale
 
-8. Apply scale tiers from actual .cs count:
-   | Scale | Range |
-   |-------|-------|
-   | Micro | < 50 |
-   | Small | 50–149 |
-   | Medium | 150–399 |
-   | Large | 400–799 |
-   | XLarge | 800–1999 |
-   | Massive | 2000+ |
+8. Apply scale tiers from actual .cs count and word count:
+   | Scale | File Count | Words |
+   |-------|-----------|-------|
+   | Micro | <50 | <50k |
+   | Small | 50–149 | 50k-150k |
+   | Medium | 150–399 | 150k-400k |
+   | Large | 400–799 | 400k-800k |
+   | XLarge | 800–1999 | 800k-1.5M |
+   | Massive | 2000-3999 | 1.5M-2.5M |
+   | Colossal | 4000-6999 | 2.5M-4M |
+   | Titan | 7000+ | 4M+ |
 
    After classifying, **verify:** sum of all tier counts MUST equal `TOTAL_PROJECTS`.
 
@@ -128,7 +130,7 @@ No user input required — this prompt scans the entire workspace.
 
 ## Phase 9 — Write WORKSPACE-REG.md
 
-14. Write `.windsurf/WORKSPACE-REG.md` with this exact structure:
+14. Write `WORKSPACE-REG.md` with this exact structure:
 
 ```markdown
 # Project Registry
@@ -178,7 +180,9 @@ No user input required — this prompt scans the entire workspace.
 | Medium (150-399) | ... | ... |
 | Large (400-799) | ... | ... |
 | XLarge (800-1999) | ... | ... |
-| Massive (2000+) | ... | ... |
+| Massive (2000-3999) | ... | ... |
+| Colossal (4000-6999) | ... | ... |
+| Titan (7000+) | ... | ... |
 
 ---
 
