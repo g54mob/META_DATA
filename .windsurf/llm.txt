@@ -1,0 +1,2 @@
+> refer: https://docs.windsurf.com/llms-full.txt
+to know more about the dot directory windsurf and it's usage.
